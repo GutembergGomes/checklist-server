@@ -372,6 +372,7 @@
                             </svg>
                         </div>
                         <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Sistema de Checklist</h1>
+                        <span class="ml-2 px-2 py-1 text-xs font-semibold text-primary border border-primary rounded">GGOMES-LOG</span>
                     </div>
                     
                     <div class="flex items-center space-x-4">
@@ -3661,7 +3662,7 @@
                 </head><body onload="window.print()">
                     <div class="container">
                         <div class="header">
-                            <div class="brand"><div class="logo">C</div><div><div class="title">Checklist</div><div class="subtitle">${new Date(inspection.data).toLocaleDateString('pt-BR')}</div></div></div>
+                            <div class="brand"><div class="logo">GG</div><div><div class="title">GGOMES-LOG • Checklist</div><div class="subtitle">${new Date(inspection.data).toLocaleDateString('pt-BR')}</div></div></div>
                             <div class="subtitle">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
                         </div>
                         <div class="info">
@@ -4162,7 +4163,7 @@
             if (pollingTimer) return;
             pollingTimer = setInterval(() => {
                 loadInitialData();
-            }, 15000);
+            }, 300000);
         }
 
         async function syncPendingInspections() {
@@ -4436,7 +4437,7 @@
                     </head><body onload="window.print()">
                         <div class="container">
                             <div class="header">
-                                <div class="brand"><div class="logo">C</div><div><div class="title">Relatório ${type}</div><div class="subtitle">${dateRange}</div></div></div>
+                                <div class="brand"><div class="logo">GG</div><div><div class="title">GGOMES-LOG • Relatório ${type}</div><div class="subtitle">${dateRange}</div></div></div>
                                 <div class="subtitle">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
                             </div>
                             <div class="kpis">
