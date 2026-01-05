@@ -71,7 +71,7 @@ export const useAppStore = create<AppState>()(
            const { error } = await supabase.auth.resetPasswordForEmail(email, {
              // Redirecionar para o site web de recuperação
              // Ajuste esta URL para o seu site de produção
-             redirectTo: 'https://seu-site-web.com/reset-password.html' 
+             redirectTo: 'https://gutemberggomes.github.io/CheckList/reset-password.html' 
            })
            return { error }
         } catch (err) {
