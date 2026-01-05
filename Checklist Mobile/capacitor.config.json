@@ -1,0 +1,8 @@
+{
+  "appId": "com.ggomes.checklist",
+  "appName": "ChecklistMobile",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ChecklistMobile</string>
+    <string name="title_activity_main">ChecklistMobile</string>
+    <string name="package_name">com.ggomes.checklist</string>
+    <string name="custom_url_scheme">com.ggomes.checklist</string>
+</resources>

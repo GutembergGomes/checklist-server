@@ -1,0 +1,332 @@
+/* Modern Design System - CSS Variables */
+
+:root {
+  /* Cores Principais - Gradientes Modernos */
+  --primary-gradient: linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%);
+  --secondary-gradient: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  --accent-gradient: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  --danger-gradient: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+  
+  /* Estados */
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --info: #3B82F6;
+  
+  /* Neutros Modernos - Paleta Slate */
+  --slate-50: #F8FAFC;
+  --slate-100: #F1F5F9;
+  --slate-200: #E2E8F0;
+  --slate-300: #CBD5E1;
+  --slate-400: #94A3B8;
+  --slate-500: #64748B;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1E293B;
+  --slate-900: #0F172A;
+  
+  /* Gradientes Especiais */
+  --glassmorphism: rgba(255, 255, 255, 0.1);
+  --glassmorphism-border: rgba(255, 255, 255, 0.2);
+  --neumorphism-light: #ffffff;
+  --neumorphism-dark: #e0e0e0;
+  
+  /* Tipografia Moderna */
+  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  /* Font Sizes - Escala Modular */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.25rem;    /* 20px */
+  --text-2xl: 1.5rem;    /* 24px */
+  --text-3xl: 1.875rem;  /* 30px */
+  --text-4xl: 2.25rem;   /* 36px */
+  --text-5xl: 3rem;      /* 48px */
+  
+  /* Font Weights */
+  --font-thin: 100;
+  --font-light: 300;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-extrabold: 800;
+  
+  /* Sistema de Espaçamento - Base 4px Grid */
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+  --space-20: 5rem;     /* 80px */
+  --space-24: 6rem;     /* 96px */
+  
+  /* Transições Modernas */
+  --transition-fast: 150ms ease-out;
+  --transition-normal: 300ms ease-out;
+  --transition-slow: 500ms ease-out;
+  --transition-bounce: 300ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Breakpoints Modernos */
+  --breakpoint-sm: 640px;   /* Tablets pequenos */
+  --breakpoint-md: 768px;   /* Tablets grandes */
+  --breakpoint-lg: 1024px;  /* Laptops */
+  --breakpoint-xl: 1280px;  /* Desktops */
+  --breakpoint-2xl: 1536px; /* Desktops grandes */
+  
+  /* Animações Modernas */
+  --animation-fade-in: fadeInScale 0.3s ease-out;
+  --animation-slide-up: slideUp 0.3s ease-out;
+  --animation-shimmer: shimmer 2s infinite linear;
+  --animation-bounce-subtle: bounceSubtle 1s infinite;
+  --animation-pulse-subtle: pulseSubtle 2s infinite;
+}
+
+/* Tema Escuro */
+[data-theme="dark"] {
+  --primary-gradient: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
+  --secondary-gradient: linear-gradient(135deg, #34D399 0%, #10B981 100%);
+  --accent-gradient: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+  --danger-gradient: linear-gradient(135deg, #F87171 0%, #EF4444 100%);
+  
+  --slate-50: #0F172A;
+  --slate-100: #1E293B;
+  --slate-200: #334155;
+  --slate-300: #475569;
+  --slate-400: #64748B;
+  --slate-500: #94A3B8;
+  --slate-600: #CBD5E1;
+  --slate-700: #E2E8F0;
+  --slate-800: #F1F5F9;
+  --slate-900: #F8FAFC;
+  
+  --glassmorphism: rgba(0, 0, 0, 0.3);
+  --glassmorphism-border: rgba(255, 255, 255, 0.1);
+}
+
+/* Animações Modernas */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes bounceSubtle {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes pulseSubtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Glassmorphism Effect */
+.glassmorphism {
+  background: var(--glassmorphism);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glassmorphism-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* Neumorphism Effect */
+.neumorphism {
+  background: var(--neumorphism-light);
+  box-shadow: 
+    8px 8px 16px var(--neumorphism-dark),
+    -8px -8px 16px var(--neumorphism-light);
+  border-radius: 20px;
+}
+
+/* Utilitários Modernos */
+.text-gradient {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.bg-primary-gradient {
+  background: var(--primary-gradient);
+}
+
+.bg-secondary-gradient {
+  background: var(--secondary-gradient);
+}
+
+.bg-accent-gradient {
+  background: var(--accent-gradient);
+}
+
+.bg-danger-gradient {
+  background: var(--danger-gradient);
+}
+
+/* Transições Suaves */
+.transition-all-modern {
+  transition: all var(--transition-smooth);
+}
+
+.transition-fast {
+  transition: all var(--transition-fast);
+}
+
+.transition-normal {
+  transition: all var(--transition-normal);
+}
+
+.transition-slow {
+  transition: all var(--transition-slow);
+}
+
+/* Hover Effects Modernos */
+.hover-lift {
+  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.hover-scale {
+  transition: transform var(--transition-smooth);
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* Focus Moderno */
+.focus-ring-modern {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+  transition: box-shadow var(--transition-fast);
+}
+
+.focus-ring-modern:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.8);
+}
+
+/* Animações de Entrada */
+.animate-fade-in {
+  animation: fadeInScale 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+.animate-bounce-subtle {
+  animation: bounceSubtle 1s infinite;
+}
+
+.animate-pulse-subtle {
+  animation: pulseSubtle 2s infinite;
+}
+
+/* Responsive Utilities */
+@media (max-width: 640px) {
+  .mobile-single-column {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .mobile-touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  .mobile-text-base {
+    font-size: 16px !important;
+  }
+}
+
+/* Acessibilidade */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-contrast: high) {
+  :root {
+    --primary-gradient: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
+    --secondary-gradient: linear-gradient(135deg, #059669 0%, #047857 100%);
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --primary-gradient: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
+    --secondary-gradient: linear-gradient(135deg, #34D399 0%, #10B981 100%);
+    --accent-gradient: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+    --danger-gradient: linear-gradient(135deg, #F87171 0%, #EF4444 100%);
+    
+    --slate-50: #0F172A;
+    --slate-100: #1E293B;
+    --slate-200: #334155;
+    --slate-300: #475569;
+    --slate-400: #64748B;
+    --slate-500: #94A3B8;
+    --slate-600: #CBD5E1;
+    --slate-700: #E2E8F0;
+    --slate-800: #F1F5F9;
+    --slate-900: #F8FAFC;
+    
+    --glassmorphism: rgba(0, 0, 0, 0.3);
+    --glassmorphism-border: rgba(255, 255, 255, 0.1);
+  }
+}

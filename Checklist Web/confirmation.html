@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Confirmado - Sistema de Checklist</title>
+    <script>(function(){try{var s=localStorage.getItem('theme');var p=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var d=s?s==='dark':p;if(d){document.documentElement.classList.add('dark');}}catch(e){}})();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        'primary-dark': '#4B46C7',
+                        'primary-light': '#8B8DF0',
+                    }
+                }
+            },
+            darkMode: 'class'
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .dark .glass-morphism {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .success-animation {
+            animation: scaleUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes scaleUp {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="h-full bg-gray-50 dark:bg-gray-900 transition-colors duration-300 flex items-center justify-center p-4">
+
+    <div class="max-w-md w-full glass-morphism rounded-2xl shadow-xl p-8 text-center transform transition-all">
+        <div class="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6 success-animation">
+            <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+            </svg>
+        </div>
+
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Email Confirmado!</h1>
+        <p class="text-gray-600 dark:text-gray-400 mb-8">
+            Sua conta foi verificada com sucesso. Você já pode acessar todas as funcionalidades do sistema.
+        </p>
+
+        <a href="index.html" class="block w-full py-3 px-4 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors duration-200 shadow-lg shadow-primary/30">
+            Ir para o Login
+        </a>
+        
+        <p class="mt-6 text-sm text-gray-500 dark:text-gray-500">
+            Você será redirecionado automaticamente em <span id="countdown">10</span> segundos...
+        </p>
+    </div>
+
+    <script>
+        // Obter parâmetros da URL (Supabase retorna access_token no hash para Implicit Grant ou query params para PKCE)
+        // Mas para confirmação de email simples, geralmente redireciona.
+        
+        // Efeito de confete simples (opcional)
+        // Redirecionamento automático
+        let seconds = 10;
+        const countdownEl = document.getElementById('countdown');
+        
+        const timer = setInterval(() => {
+            seconds--;
+            countdownEl.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(timer);
+                window.location.href = 'index.html';
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
