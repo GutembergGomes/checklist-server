@@ -719,6 +719,7 @@ export const useAppStore = create<AppState>()(
                 observacao: response.observacoes ?? null,
                 mecanico: mecanicoNome,
                 local_id: response.id,
+                id: response.id, // Ensure canonical ID is sent
                 created_at: new Date().toISOString(),
               }
               const retry = async (fn: ()=>Promise<any>, attempts=3) => {
@@ -730,7 +731,7 @@ export const useAppStore = create<AppState>()(
                 }
                 return { error: lastErr || new Error('Upsert failed') }
               }
-              const upsertCall = () => supabase.from('inspections').upsert(payload, { onConflict: 'local_id' }).select()
+              const upsertCall = () => supabase.from('inspections').upsert(payload, { onConflict: 'id' }).select()
               const { error, data: upsertData } = await retry(upsertCall)
               if (!error) {
                 await offlineStorage.saveResposta({ ...response, sincronizado: true }, true)
