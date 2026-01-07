@@ -179,7 +179,11 @@ class QueryBuilder<T> {
         result = { data, error: null }
       }
       else if (this.operation === 'upsert') {
-        const payload = Array.isArray(this.body) ? this.body : [this.body]
+        const payloadRaw = Array.isArray(this.body) ? this.body : [this.body]
+        const payload = payloadRaw.map((it: any) => {
+          const { created_at, ...rest } = it || {}
+          return rest
+        })
         const data: T[] = await request(`/db/${this.table}/upsert`, {
            method: 'POST',
            body: JSON.stringify({ data: payload, onConflict: this.upsertOptions?.onConflict })
