@@ -13,7 +13,12 @@ window.createApiClient = function() {
                     });
                     const data = await res.json();
                     if (!res.ok) return { data: null, error: { message: data.error || 'Erro no login' } };
-                    if (data.token) localStorage.setItem('checklist-auth-token', data.token);
+                    if (data.token) {
+                        localStorage.setItem('checklist-auth-token', data.token);
+                        if (data.user) {
+                            localStorage.setItem('checklist-user-data', JSON.stringify(data.user));
+                        }
+                    }
                     return { data: { user: data.user, session: { access_token: data.token } }, error: null };
                 } catch (e) {
                     return { data: null, error: { message: e.message } };
