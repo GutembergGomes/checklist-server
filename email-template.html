@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirme seu Email</title>
+    <style>
+        body { margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .header { background-color: #5D5CDE; padding: 32px 20px; text-align: center; }
+        .logo-text { color: #ffffff; font-size: 24px; font-weight: bold; margin: 0; letter-spacing: -0.5px; }
+        .content { padding: 40px 30px; color: #374151; line-height: 1.6; }
+        .title { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 16px; margin-top: 0; }
+        .text { font-size: 16px; color: #4b5563; margin-bottom: 24px; }
+        .button-container { text-align: center; margin: 32px 0; }
+        .button { background-color: #5D5CDE; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(93, 92, 222, 0.25); transition: background-color 0.2s; }
+        .button:hover { background-color: #4B46C7; }
+        .footer { background-color: #f9fafb; padding: 24px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb; }
+        .link { color: #5D5CDE; text-decoration: none; }
+        @media only screen and (max-width: 600px) {
+            .container { margin: 20px; width: auto; }
+            .content { padding: 30px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="logo-text">Sistema de Checklist</h1>
+        </div>
+        <div class="content">
+            <h2 class="title">Confirme seu endereço de email</h2>
+            <p class="text">Olá,</p>
+            <p class="text">Obrigado por se cadastrar no Sistema de Checklist. Para começar a usar sua conta, precisamos confirmar que este email é realmente seu.</p>
+            
+            <div class="button-container">
+                <a href="{{ .ConfirmationURL }}" class="button">Confirmar Email</a>
+            </div>
+            
+            <p class="text">Ou copie e cole o link abaixo no seu navegador:</p>
+            <p style="font-size: 12px; color: #6b7280; word-break: break-all;">{{ .ConfirmationURL }}</p>
+            
+            <p class="text" style="margin-top: 30px;">Se você não criou esta conta, pode ignorar este email com segurança.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2024 Sistema de Checklist. Todos os direitos reservados.</p>
+        </div>
+    </div>
+</body>
+</html>
