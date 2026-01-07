@@ -181,8 +181,8 @@ class QueryBuilder<T> {
       else if (this.operation === 'upsert') {
         const payloadRaw = Array.isArray(this.body) ? this.body : [this.body]
         const payload = payloadRaw.map((it: any) => {
-          const { created_at, ...rest } = it || {}
-          return rest
+          // Keep created_at to respect client timestamp
+          return it
         })
         const data: T[] = await request(`/db/${this.table}/upsert`, {
            method: 'POST',

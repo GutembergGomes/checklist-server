@@ -356,25 +356,10 @@ export const useAppStore = create<AppState>()(
           
           const uniquePending = pendingInspections.filter(p => !freshIds.has(p.id) && !freshLocalIds.has(p.local_id))
           
-          // SAFETY: Keep recent items from cache that are missing from server (Replication Lag / Consistency protection)
-          // If we just synced an item, it might not appear in 'fresh' immediately.
-          // We look for items in the current 'inspections' state (or cache) that are:
-          // 1. Not pending
-          // 2. Not in 'fresh'
-          // 3. Created recently (< 1 hour)
-          const currentCached = get().inspections || []
-          const oneHourAgo = Date.now() - 60 * 60 * 1000
-          
-          const recentMissing = currentCached.filter((item: any) => {
-             const isPending = item.pending
-             const inFresh = freshIds.has(item.id) || (item.local_id && freshLocalIds.has(item.local_id))
-             const createdTime = new Date(item.created_at).getTime()
-             const isRecent = createdTime > oneHourAgo
-             
-             return !isPending && !inFresh && isRecent
-          })
+          // SAFETY: REMOVED recentMissing logic to allow deletions to propagate immediately.
+          // If it's not in fresh (server) and not pending (local), it should be considered deleted.
 
-          const merged = [...uniquePending, ...recentMissing, ...fresh].sort((a:any,b:any)=> 
+          const merged = [...uniquePending, ...fresh].sort((a:any,b:any)=> 
             new Date(b.created_at || b.data || 0).getTime() - new Date(a.created_at || a.data || 0).getTime()
           )
 

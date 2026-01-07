@@ -7754,7 +7754,8 @@
         }
 
         function updateRecentInspections() {
-            const container = document.getElementById('inspecoesRecentes');
+            const container = document.getElementById('recentInspectionsTableBody');
+            if (!container) return;
             const all = viewMode === 'cct' ? inspections.slice() : (viewMode === 'irr' ? (Array.isArray(irrigInspections) ? irrigInspections.slice() : []) : getAllInspectionsCombined());
             const recent = all.slice().sort((a,b) => {
                 const ta = new Date(a.created_at || a.data).getTime();
@@ -7764,12 +7765,16 @@
             
             if (recent.length === 0) {
                 container.innerHTML = `
-                    <div class="text-center text-gray-500 dark:text-gray-400 py-8">
-                        <svg class="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                        </svg>
-                        <p class="mt-2">Nenhuma inspeção realizada ainda</p>
-                    </div>
+                    <tr>
+                        <td colspan="4" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                            <div class="flex flex-col items-center justify-center">
+                                <svg class="h-8 w-8 text-gray-300 dark:text-gray-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                                <p class="text-sm">Nenhuma inspeção realizada ainda</p>
+                            </div>
+                        </td>
+                    </tr>
                 `;
                 return;
             }
@@ -7777,19 +7782,20 @@
             container.innerHTML = recent.map(inspection => {
                 const statusColor = inspection.results.percentage >= 80 ? 'green' : 
                                   inspection.results.percentage >= 60 ? 'yellow' : 'red';
+                const statusText = inspection.results.percentage >= 80 ? 'Aprovado' : 
+                                 inspection.results.percentage >= 60 ? 'Atenção' : 'Reprovado';
                 
                 return `
-                    <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <div>
-                            <p class="font-medium text-gray-900 dark:text-white">${inspection.frota}</p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">${inspection.tipo.charAt(0).toUpperCase() + inspection.tipo.slice(1)} - ${formatDateBR(inspection.data)}</p>
-                        </div>
-                        <div class="text-right">
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">${inspection.frota}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${inspection.tipo.charAt(0).toUpperCase() + inspection.tipo.slice(1)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${formatDateBR(inspection.data)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-800 dark:bg-${statusColor}-900 dark:text-${statusColor}-200">
                                 ${inspection.results.percentage}%
                             </span>
-                        </div>
-                    </div>
+                        </td>
+                    </tr>
                 `;
             }).join('');
         }

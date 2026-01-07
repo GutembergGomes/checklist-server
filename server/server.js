@@ -258,9 +258,11 @@ app.post('/db/:table/insert', async (req, res) => {
 app.post('/db/:table/upsert', async (req, res) => {
   try {
     const { data, onConflict } = req.body
+    if (!data) return res.status(400).json({ error: 'Missing data payload' })
     const result = await dbUpsert(req.params.table, data, onConflict)
     res.json(result)
   } catch (e) {
+    console.error('Upsert error:', e)
     res.status(500).json({ error: e.message })
   }
 })
