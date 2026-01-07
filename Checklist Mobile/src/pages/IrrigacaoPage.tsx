@@ -102,8 +102,10 @@ function EquipmentSelection({ onSelectEquipment }: { onSelectEquipment: (type: s
 
 // Inspection Form Component
 function InspectionForm({ equipmentType, onBack }: { equipmentType: string, onBack: () => void }) {
-  const { user } = useAppStore()
+  const { user, equipamentos } = useAppStore()
+  const [customFrota, setCustomFrota] = useState('')
   const [formData, setFormData] = useState({
+    frota: '',
     pressao: '',
     vazao: '',
     ph: '',
@@ -116,6 +118,14 @@ function InspectionForm({ equipmentType, onBack }: { equipmentType: string, onBa
     observacoes: ''
   })
 
+  const filteredEquipments = equipamentos.filter(e => {
+    const t = (e.tipo || '').toLowerCase()
+    const target = equipmentType.toLowerCase()
+    if (t === target) return true
+    if (target === 'caminhoes' && (t === 'caminhao' || t === 'truck')) return true
+    return false
+  })
+
   const [savedData, setSavedData] = useState<any>(null)
 
   const handleInputChange = (field: string, value: string) => {
@@ -123,12 +133,17 @@ function InspectionForm({ equipmentType, onBack }: { equipmentType: string, onBa
   }
 
   const handleSave = () => {
-    const requiredFields = ['pressao', 'vazao', 'ph', 'condutividade']
+    const requiredFields = ['frota', 'pressao', 'vazao', 'ph', 'condutividade']
     const isValid = requiredFields.every(field => formData[field as keyof typeof formData].trim() !== '')
     
     if (!isValid) {
       alert('Por favor, preencha todos os campos obrigatórios')
       return
+    }
+
+    if (formData.frota === 'custom' && !customFrota.trim()) {
+       alert('Por favor, digite a identificação da frota.')
+       return
     }
 
     const pressao = parseFloat(formData.pressao)
@@ -149,6 +164,7 @@ function InspectionForm({ equipmentType, onBack }: { equipmentType: string, onBa
 
     const dataToSave = {
       ...formData,
+      frota: formData.frota === 'custom' ? customFrota : formData.frota,
       nivelManutencao,
       percentual,
       equipmentType,
@@ -162,6 +178,7 @@ function InspectionForm({ equipmentType, onBack }: { equipmentType: string, onBa
 
   const handleClear = () => {
     setFormData({
+      frota: '',
       pressao: '',
       vazao: '',
       ph: '',
@@ -289,14 +306,32 @@ function InspectionForm({ equipmentType, onBack }: { equipmentType: string, onBa
                 Frota <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-2">
-                <select title="Selecionar frota" aria-label="Selecionar frota" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                <select 
+                  title="Selecionar frota" 
+                  aria-label="Selecionar frota" 
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  value={formData.frota}
+                  onChange={(e) => handleInputChange('frota', e.target.value)}
+                >
                   <option value="">Selecione uma frota</option>
+                  {filteredEquipments.map(eq => (
+                    <option key={eq.id} value={eq.codigo}>{eq.codigo} - {eq.descricao}</option>
+                  ))}
                   <option value="custom">Outro (digitar)</option>
                 </select>
                 <button type="button" className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                   Gerenciar
                 </button>
               </div>
+              {formData.frota === 'custom' && (
+                 <input 
+                   type="text" 
+                   placeholder="Digite a identificação da frota"
+                   className="mt-2 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   value={customFrota}
+                   onChange={(e) => setCustomFrota(e.target.value)}
+                 />
+               )}
             </div>
 
             <div>

@@ -5,7 +5,7 @@ import { useAppStore } from '../stores/appStore'
 import { offlineStorage } from '../utils/offlineStorage'
 import { formatPercent } from '../lib/utils'
 export default function ChecklistsPage() {
-  const { inspections, loadInspections } = useAppStore() as any
+  const { inspections, loadInspections, user } = useAppStore() as any
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [statuses, setStatuses] = useState<Record<string, 'pendente'|'sincronizado'>>({})
@@ -28,18 +28,38 @@ export default function ChecklistsPage() {
           try {
             const checklist = await offlineStorage.getChecklistById(r.checklist_id)
             const itens = (checklist?.itens || [])
-            const statuses = itens.map((it: any) => {
+            const itemsResult = itens.map((it: any) => {
+              const raw = String(it.descricao || '')
+              const parts = raw.split(' • ')
+              const section = parts.length > 1 ? parts[0] : 'Geral'
+              const name = parts.length > 1 ? parts.slice(1).join(' • ') : raw
               const val = (r.respostas || []).find((x:any)=> x.item_id === it.id)?.valor
-              if (it.tipo === 'numero') return null
-              const n = normalize(val)
-              if (n === 'ok' || n === 'aprovado' || n === 'true') return 'ok'
-              if (n.includes('nao ok') || n.includes('não ok') || n === 'reprovado' || n === 'false') return 'nao_ok'
-              if (n.includes('nao aplica') || n.includes('não aplica') || n === 'na' || n === 'n/a') return 'nao_aplica'
-              return null
+              const normalize = (s: any) => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
+              let status: 'ok' | 'notok' | 'na' = 'na'
+              if (it.tipo === 'booleano' || it.tipo === 'opcoes') {
+                 const n = normalize(val)
+                 if (n === 'ok' || n === 'aprovado' || n === 'true' || n === 'sim' || n === 'conforme') status = 'ok'
+                 else if (n.includes('nao ok') || n.includes('não ok') || n === 'reprovado' || n === 'false') status = 'notok'
+                 else if (n.includes('nao aplica') || n.includes('não aplica') || n === 'na' || n === 'n/a') status = 'na'
+              }
+              const note = typeof val === 'string' ? val : (val === true ? 'OK' : (val === false ? 'Não OK' : String(val ?? '')))
+              return { id: it.id, name, section, status, note, photos: undefined as string[] | undefined }
             })
+            if (r.observacoes) {
+                itemsResult.push({ id: 'observacao', name: 'Observação', section: 'Geral', status: 'na', note: r.observacoes, photos: undefined })
+             }
+            try {
+               const fotos = await offlineStorage.getFotosByRespostaId(r.id)
+               const urls = (fotos || []).map((f:any)=> f.url).filter(Boolean)
+               if (urls.length) {
+                 itemsResult.push({ id: 'fotos', name: 'Fotos', section: 'Geral', status: 'na', note: '', photos: urls })
+               }
+            } catch {}
+
+            const statuses = itemsResult.map((it:any) => it.status)
             const ok = statuses.filter((s:any) => s === 'ok').length
-            const naoOk = statuses.filter((s:any) => s === 'nao_ok').length
-            const totalConsidered = statuses.filter((s:any) => s !== 'nao_aplica').length
+            const naoOk = statuses.filter((s:any) => s === 'notok').length
+            const totalConsidered = statuses.filter((s:any) => s !== 'na').length
             const percent = totalConsidered ? Math.round((ok / totalConsidered) * 100) : 0
             mapped.push({
               id: r.id,
@@ -50,6 +70,8 @@ export default function ChecklistsPage() {
               created_at: r.created_at || r.data_execucao || new Date().toISOString(),
               results: { percentage: percent },
               pending: true,
+              items: itemsResult,
+              observacao: r.observacoes
             })
           } catch {
             mapped.push({
@@ -96,9 +118,9 @@ export default function ChecklistsPage() {
 
   
 
-  const { deleteChecklist } = useAppStore()
+  const { deleteInspection } = useAppStore()
   const handleDelete = async (id: string) => {
-    try { await deleteChecklist(id) } catch {}
+    try { await deleteInspection(id) } catch {}
   }
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR')
@@ -170,7 +192,8 @@ export default function ChecklistsPage() {
           {filteredInspections.map((item:any) => (
             <Link
               key={item.local_id || item.id}
-              to={`/checklist/${item.checklist_id || ''}`}
+              to={`/inspection/${item.local_id || item.id}`}
+              state={{ inspection: item }}
               className="block glassmorphism rounded-lg border border white/30 p-4 hover:bg-white/15 transition-all-modern"
             >
               <div className="flex items-start justify-between mb-3">
@@ -178,14 +201,19 @@ export default function ChecklistsPage() {
                   <h3 className="font-semibold mb-1">{item.frota}</h3>
                   <p className="text-sm text white/80 capitalize">{item.tipo}</p>
                 </div>
+                {user?.email === 'gutemberggg10@gmail.com' && (
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); /* deletar não aplicável para inspeções sincronizadas */ }}
+                  onClick={(e) => { 
+                    e.preventDefault(); 
+                    handleDelete(item.local_id || item.id) 
+                  }}
                   className="px-2 py-1 rounded-md bg-white/10 border border-white/30 hover:bg-white/20"
                   aria-label="Excluir"
                 >
                   <Trash className="w-4 h-4 text-white" />
                 </button>
+                )}
               </div>
 
               <div className="flex items-center justify-between text-sm text-white/80">

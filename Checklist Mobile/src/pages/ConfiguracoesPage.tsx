@@ -54,8 +54,7 @@ function ConfiguracoesPage() {
                 const url = base.includes('?') ? `${base}&download=1` : `${base}?download=1`
                 await Browser.open({ url })
               } catch (e) {
-                const fallback = 'https://orryqrjtzsvsvahsczse.supabase.co/storage/v1/object/public/app/app-debug-20251128160756.apk?download=1'
-                try { await Browser.open({ url: fallback }) } catch {}
+                alert('Não foi possível verificar atualizações')
               }
             }}
             className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg"

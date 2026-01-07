@@ -7,6 +7,7 @@ import { useAppStore } from "./stores/appStore"
 import LoginPage from "./pages/LoginPage"
 import DashboardPage from "./pages/DashboardPage"
 import ChecklistsPage from "./pages/ChecklistsPage"
+import InspectionDetailsPage from "./pages/InspectionDetailsPage"
 import ChecklistFormPage from "./pages/ChecklistFormPage"
 import EquipamentosPage from "./pages/EquipamentosPage"
 import ScannerPage from "./pages/ScannerPage"
@@ -48,6 +49,19 @@ function App() {
     } catch {}
   }, [checkAuth, initializeOfflineStorage])
 
+  useEffect(() => {
+    const handler = (ev: any) => {
+      const d = ev?.detail || {}
+      if (d?.message) {
+        showToast(d.message, d.type, d.duration)
+      }
+    }
+    window.addEventListener('app:notify', handler as any)
+    return () => {
+      window.removeEventListener('app:notify', handler as any)
+    }
+  }, [showToast])
+
   if (isLoading) {
     return <LoadingSpinner />
   }
@@ -72,6 +86,7 @@ function App() {
                     <Routes>
                       <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/checklists" element={<ChecklistsPage />} />
+                      <Route path="/inspection/:id" element={<InspectionDetailsPage />} />
                       <Route path="/checklist/:id" element={<ChecklistFormPage />} />
                       <Route path="/equipamentos" element={<EquipamentosPage />} />
                       <Route path="/scanner" element={<ScannerPage />} />

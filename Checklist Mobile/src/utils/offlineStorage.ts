@@ -3,20 +3,8 @@ import { Checklist, RespostaChecklist, Equipamento, Foto } from '../types/databa
 const DB_NAME = 'ChecklistMobileDB'
 const DB_VERSION = 3
 
-interface DatabaseSchema {
-  checklists: Checklist
-  respostas: RespostaChecklist
-  equipamentos: Equipamento
-  fotos: Foto
-  sync_queue: {
-    id: string
-    type: 'create' | 'update' | 'delete'
-    table: string
-    data: any
-    timestamp: string
-    synced: boolean
-  }
-}
+// Interface kept for documentation
+// interface DatabaseSchema { ... }
 
 class OfflineStorage {
   private db: IDBDatabase | null = null
@@ -166,7 +154,7 @@ class OfflineStorage {
     })
   }
 
-  async saveResposta(resposta: RespostaChecklist): Promise<void> {
+  async saveResposta(resposta: RespostaChecklist, skipQueue: boolean = false): Promise<void> {
     await this.ensure()
 
     return new Promise((resolve, reject) => {
@@ -177,7 +165,9 @@ class OfflineStorage {
       request.onerror = () => reject(request.error)
       request.onsuccess = () => {
         // Add to sync queue
-        this.addToSyncQueue('create', 'respostas_checklist', resposta)
+        if (!skipQueue) {
+          this.addToSyncQueue('create', 'respostas_checklist', resposta)
+        }
         resolve()
       }
     })
@@ -193,6 +183,17 @@ class OfflineStorage {
 
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve((request.result || []).filter((r:any) => r.sincronizado === false))
+    })
+  }
+
+  async deleteResposta(id: string): Promise<void> {
+    await this.ensure()
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['respostas'], 'readwrite')
+      const store = transaction.objectStore('respostas')
+      const request = store.delete(id)
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => resolve()
     })
   }
 
@@ -493,6 +494,33 @@ class OfflineStorage {
       }
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
+    })
+  }
+
+  async deleteInspectionCache(id: string): Promise<void> {
+    await this.ensure()
+    return new Promise((resolve, reject) => {
+      const tx = this.db!.transaction(['inspections_cache'], 'readwrite')
+      const store = tx.objectStore('inspections_cache')
+      
+      // We need to find the key by local_id or id matching our id
+      // Since key is autoIncrement, we iterate or use index if we had one on local_id.
+      // We don't have index on local_id, but we have on created_at.
+      // Let's iterate. It's not efficient but fine for now.
+      const req = store.openCursor()
+      req.onsuccess = () => {
+        const cursor = req.result
+        if (cursor) {
+          const val = cursor.value
+          if (String(val.local_id || '') === id || String(val.id || '') === id) {
+            cursor.delete()
+          }
+          cursor.continue()
+        } else {
+          resolve()
+        }
+      }
+      req.onerror = () => reject(req.error)
     })
   }
 

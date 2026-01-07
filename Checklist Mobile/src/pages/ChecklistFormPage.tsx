@@ -150,11 +150,6 @@ function ChecklistFormPage() {
     } catch {}
   }
 
-  const { deleteChecklist } = useAppStore()
-  const handleDelete = async () => {
-    if (!checklist) return
-    await deleteChecklist(checklist.id)
-  }
 
   const percentComplete = useMemo(() => {
     const total = itens.length

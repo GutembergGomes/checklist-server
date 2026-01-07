@@ -3193,11 +3193,18 @@
     </div>
 
     <script>
-        // Configuração do Supabase
-        const SUPABASE_URL = 'https://orryqrjtzsvsvahsczse.supabase.co'; // Substitua pela sua URL
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ycnlxcmp0enN2c3ZhaHNjenNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5NTYxNjEsImV4cCI6MjA3OTUzMjE2MX0.4Z0Np0DkRvO1vOowihV_La5xSIbZttaJOxY7kMOmfgI'; // Substitua pela sua chave
-        const INSPECTION_PHOTOS_BUCKET = 'inspection-photos';
+        // ==========================================
+        // CONFIGURAÇÃO DO SUPABASE
+        // ==========================================
+        // Se o seu limite gratuito expirou, crie um novo projeto em https://supabase.com
+        // e substitua as chaves abaixo pelas do novo projeto.
         
+        const SUPABASE_URL = 'https://orryqrjtzsvsvahsczse.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ycnlxcmp0enN2c3ZhaHNjenNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5NTYxNjEsImV4cCI6MjA3OTUzMjE2MX0.4Z0Np0DkRvO1vOowihV_La5xSIbZttaJOxY7kMOmfgI';
+        
+        const INSPECTION_PHOTOS_BUCKET = 'inspection-photos';
+        // ==========================================
+
         // Inicializar cliente Supabase
         var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
@@ -4924,6 +4931,27 @@
                 }
             } catch (error) {
                 console.error('Erro de autenticação:', error);
+                
+                // Fallback para modo offline em caso de erro de conexão ou CORS
+                if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('CORS'))) {
+                    if (confirm('Erro de conexão com o servidor. Deseja entrar em Modo Offline?')) {
+                        const offlineUser = { 
+                            id: 'offline', 
+                            email: email || 'offline@user.com', 
+                            user_metadata: { first_name: 'Modo', last_name: 'Offline' },
+                            aud: 'authenticated',
+                            role: 'authenticated'
+                        };
+                        currentUser = offlineUser;
+                        setCachedUser(offlineUser);
+                        showApp();
+                        showFloatingNotification('warning', 'Entrando em Modo Offline. Algumas funcionalidades podem estar limitadas.');
+                        // Carregar dados locais
+                        setTimeout(loadInitialData, 100);
+                        return;
+                    }
+                }
+
                 showCustomAlert(error.message || 'Falha na autenticação.');
                 showFloatingNotification('error', error.message);
             } finally {
@@ -5273,7 +5301,51 @@
             }
         }
 
+        const fallbackTanks = [
+            { frota: '6290', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6291', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6292', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6293', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6294', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6295', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6296', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6297', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6298', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6299', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6300', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6301', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6302', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6303', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6304', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6305', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6306', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6307', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6308', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6309', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6310', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6311', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6312', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6313', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6314', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6315', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6316', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6317', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6318', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6319', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6320', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6321', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6322', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6323', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6324', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6325', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6326', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6327', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6328', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' },
+            { frota: '6329', descricao: 'Reboque Tanque Rodofort', tipo: 'tanques' }
+        ];
+
         async function loadEquipments() {
+            let fetched = [];
             try {
                 if (isOnline()) {
                     const resp = await supabase
@@ -5281,15 +5353,25 @@
                         .select('*')
                         .order('created_at', { ascending: false });
                     if (!resp.error) {
-                        equipments = resp.data || [];
-                        setCachedEquipments(equipments);
-                        return;
+                        fetched = resp.data || [];
+                    } else {
+                        fetched = getCachedEquipments() || [];
                     }
+                } else {
+                    fetched = getCachedEquipments() || [];
                 }
-                equipments = getCachedEquipments();
             } catch (_) {
-                equipments = getCachedEquipments();
+                fetched = getCachedEquipments() || [];
             }
+            
+            // Merge fallback tanks
+            const map = new Map();
+            fetched.forEach(e => map.set(String(e.frota), e));
+            fallbackTanks.forEach(e => {
+                if (!map.has(String(e.frota))) map.set(String(e.frota), { ...e, status: 'ativo' });
+            });
+            equipments = Array.from(map.values());
+            setCachedEquipments(equipments);
         }
 
         function typeAliases(t) {
@@ -5303,7 +5385,8 @@
                 manutencao: ['manutencao','maintenance'],
                 transbordo: ['transbordo'],
                 cct_coque: ['cct_coque','cctCoque'],
-                cobridores: ['cobridores']
+                cobridores: ['cobridores'],
+                tanques: ['tanques', 'irrigacao_tanques']
             };
             return map[t] || [t];
         }
