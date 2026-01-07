@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../stores/appStore'
-import { supabase } from '../utils/supabase/client'
+import { createApiClient } from '../utils/apiClient'
 import { offlineStorage } from '../utils/offlineStorage'
 import { Checklist, ChecklistItem, Equipamento } from '../types/database'
 import { defaultMotivos, getDefaultItems } from '../utils/checklistTemplates'
 import { normalizeItems } from '../utils/itemNormalize'
 import { buildLegacyItems, legacyTemplates } from '../utils/legacyTemplates'
+
+const supabase = createApiClient()
 
 function ScannerPage() {
   const navigate = useNavigate()

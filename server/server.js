@@ -195,10 +195,29 @@ app.post('/auth/signin', async (req, res) => {
   // Accept any login for now or check against DB
   if (!email) return res.status(400).json({ error: 'Email required' })
   
-  const token = crypto.randomUUID()
-  const user = { id: crypto.randomUUID(), email, user_metadata: { name: email.split('@')[0] } }
-  sessions.set(token, { user, created_at: Date.now() })
-  res.json({ token, user })
+  // Try to find existing user to preserve ID
+  try {
+    const users = await dbFind('users', { email })
+    let user = users[0]
+
+    if (!user) {
+        // Create new user if not exists
+        user = { 
+            id: crypto.randomUUID(), 
+            email, 
+            user_metadata: { name: email.split('@')[0] },
+            created_at: new Date().toISOString()
+        }
+        await dbInsert('users', user)
+    }
+
+    const token = crypto.randomUUID()
+    sessions.set(token, { user, created_at: Date.now() })
+    res.json({ token, user })
+  } catch (e) {
+    console.error('Login error:', e)
+    res.status(500).json({ error: 'Login failed' })
+  }
 })
 
 app.get('/auth/session', (req, res) => {

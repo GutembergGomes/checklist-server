@@ -1,11 +1,15 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, supabaseConfigured } from '../utils/supabase/client'
+import { createApiClient } from '../utils/apiClient'
 import { offlineStorage } from '../utils/offlineStorage'
 import { Checklist, RespostaChecklist, Equipamento, Usuario } from '../types/database'
 import { App } from '@capacitor/app'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { tanquesData } from '../utils/tankData'
+
+// Initialize API client
+const supabase = createApiClient()
+const supabaseConfigured = true
 
 const notify = (detail: { message: string; type?: 'success' | 'error' | 'info' | 'warning'; duration?: number }) => {
   try {

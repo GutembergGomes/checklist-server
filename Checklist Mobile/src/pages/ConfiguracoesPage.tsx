@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { offlineStorage } from '../utils/offlineStorage'
 import { useAppStore } from '../stores/appStore'
-import { supabase } from '../utils/supabase/client'
+import { createApiClient } from '../utils/apiClient'
 import { Browser } from '@capacitor/browser'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
+
+const supabase = createApiClient()
 
 function ConfiguracoesPage() {
   const [usage, setUsage] = useState<{ used: number; quota: number; percentage: number }>({ used: 0, quota: 0, percentage: 0 })
