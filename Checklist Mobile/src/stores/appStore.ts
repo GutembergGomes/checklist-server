@@ -149,7 +149,7 @@ export const useAppStore = create<AppState>()(
           return false
         } catch (error) {
           const msg = String((error as any)?.message || error)
-          const networkFail = msg.includes('Failed to fetch') || msg.includes('net::ERR_FAILED') || !supabaseConfigured
+          const networkFail = msg.includes('Failed to fetch') || msg.includes('net::ERR_FAILED')
           if (networkFail) {
             const offlineUser: Usuario = {
               id: 'offline-user',
