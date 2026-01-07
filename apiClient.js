@@ -99,7 +99,12 @@ window.createApiClient = function() {
                         } else if (query.upsertData) {
                             options.method = 'POST';
                             url += '/upsert';
-                            options.body = JSON.stringify(query.upsertData);
+                            const raw = Array.isArray(query.upsertData.data) ? query.upsertData.data : [query.upsertData.data];
+                            const cleaned = raw.map((it) => {
+                                const { created_at, ...rest } = it || {};
+                                return rest;
+                            });
+                            options.body = JSON.stringify({ data: cleaned, onConflict: query.upsertData.onConflict });
                         } else if (query.updateData) {
                              // Update no server original é POST upsert ou custom?
                              // O server.js não tem endpoint de update genérico com filtro, apenas upsert ou delete by ID.
@@ -114,8 +119,8 @@ window.createApiClient = function() {
                              const idFilter = query.filters.find(f => f.col === 'id');
                              let payload = query.updateData;
                              if (idFilter) payload = { ...payload, id: idFilter.val };
-                             
-                             options.body = JSON.stringify({ data: [payload], onConflict: 'id' });
+                             const { created_at, ...rest } = payload || {};
+                             options.body = JSON.stringify({ data: [rest], onConflict: 'id' });
                         } else if (query.isDelete) {
                              options.method = 'DELETE';
                              const idFilter = query.filters.find(f => f.col === 'id');
