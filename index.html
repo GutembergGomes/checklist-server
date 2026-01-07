@@ -6,8 +6,8 @@
     <title>Sistema Avançado de Checklist de Manutenção</title>
     <script>(function(){try{var s=localStorage.getItem('theme');var p=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var d=s?s==='dark':p;if(d){document.documentElement.classList.add('dark');}}catch(e){}})();</script>
     
-    <!-- CDN do Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Cliente API Personalizado (Substitui Supabase) -->
+    <script src="apiClient.js"></script>
     
     <!-- Outras dependências -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -3194,19 +3194,12 @@
 
     <script>
         // ==========================================
-        // CONFIGURAÇÃO DO SUPABASE
+        // CONFIGURAÇÃO DO API CLIENT
         // ==========================================
-        // Se o seu limite gratuito expirou, crie um novo projeto em https://supabase.com
-        // e substitua as chaves abaixo pelas do novo projeto.
-        
-        const SUPABASE_URL = 'https://orryqrjtzsvsvahsczse.supabase.co'; 
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ycnlxcmp0enN2c3ZhaHNjenNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5NTYxNjEsImV4cCI6MjA3OTUzMjE2MX0.4Z0Np0DkRvO1vOowihV_La5xSIbZttaJOxY7kMOmfgI';
-        
         const INSPECTION_PHOTOS_BUCKET = 'inspection-photos';
-        // ==========================================
-
-        // Inicializar cliente Supabase
-        var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Inicializar cliente API (substitui Supabase)
+        var supabase = window.createApiClient();
         
         // Estado global da aplicação
         let currentUser = null;
