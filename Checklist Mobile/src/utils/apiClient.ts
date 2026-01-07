@@ -139,10 +139,38 @@ class QueryBuilder<T> {
       let result: any
       
       if (this.operation === 'select') {
-        const list: T[] = await request(`/db/${this.table}`, { method: 'GET' })
+        // Construct query parameters
+        const params = new URLSearchParams()
+        
+        // Handle standard filters
+        for (const [k, v] of Object.entries(this.filters)) {
+           params.append(k, String(v))
+        }
+
+        // Handle sorting
+        if (this.orderBy) {
+            params.append('orderBy', this.orderBy.column)
+            params.append('orderDir', this.orderBy.ascending ? 'asc' : 'desc')
+        }
+
+        // Handle limit if no complex client-side filters
+        // If we have complex filters, we might still fetch all. 
+        // But if server handles sort, we can pass limit safely if no complex filters.
+        if (this.limitCount !== null && this.complexFilters.length === 0) {
+            params.append('limit', String(this.limitCount))
+        }
+
+        const queryString = params.toString()
+        const url = `/db/${this.table}${queryString ? '?' + queryString : ''}`
+        
+        const list: T[] = await request(url, { method: 'GET' })
         let data = Array.isArray(list) ? [...list] : []
         
-        // Local filtering
+        // Client-side filtering (still needed for complex filters or if server ignores some params)
+        // But if we sent params, server hopefully filtered some.
+        // We re-apply filters to be safe, unless we trust server 100%. 
+        // For 'eq' filters, re-applying is harmless.
+        
         for (const [k, v] of Object.entries(this.filters)) {
           data = data.filter((row: any) => String(row?.[k] ?? '') === String(v))
         }
@@ -163,7 +191,7 @@ class QueryBuilder<T> {
           })
         }
         
-        // Limit
+        // Limit (client side cut if complex filters existed or sort happened)
         if (this.limitCount !== null) {
           data = data.slice(0, this.limitCount)
         }
@@ -180,10 +208,9 @@ class QueryBuilder<T> {
       }
       else if (this.operation === 'upsert') {
         const payloadRaw = Array.isArray(this.body) ? this.body : [this.body]
-          const payload = payloadRaw.map((it: any) => {
-            const { created_at, ...rest } = it
-            return rest
-          })
+          // Don't strip created_at - let server handle it (server uses $setOnInsert)
+          // keeping it allows preserving client-side timestamp if set
+          const payload = payloadRaw
           const data: T[] = await request(`/db/${this.table}/upsert`, {
            method: 'POST',
            body: JSON.stringify({ data: payload, onConflict: this.upsertOptions?.onConflict })
