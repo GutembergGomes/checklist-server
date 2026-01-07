@@ -60,7 +60,13 @@ window.createApiClient = function() {
             
             const builder = {
                 select: (cols) => { query.select = cols; return builder; },
-                eq: (col, val) => { query.filters.push({ col, val }); return builder; },
+                eq: (col, val) => { query.filters.push({ col, val, op: 'eq' }); return builder; },
+                neq: (col, val) => { query.filters.push({ col, val, op: 'neq' }); return builder; },
+                gt: (col, val) => { query.filters.push({ col, val, op: 'gt' }); return builder; },
+                gte: (col, val) => { query.filters.push({ col, val, op: 'gte' }); return builder; },
+                lt: (col, val) => { query.filters.push({ col, val, op: 'lt' }); return builder; },
+                lte: (col, val) => { query.filters.push({ col, val, op: 'lte' }); return builder; },
+                in: (col, val) => { query.filters.push({ col, val, op: 'in' }); return builder; },
                 order: (col, opts) => { query.order = { col, ...opts }; return builder; },
                 limit: (n) => { query.limit = n; return builder; },
                 insert: (data) => {
@@ -119,19 +125,81 @@ window.createApiClient = function() {
                             options.method = 'GET';
                             delete options.headers['Content-Type'];
                             const params = new URLSearchParams();
-                            query.filters.forEach(f => params.append(f.col, f.val));
-                            if(query.limit) params.append('limit', query.limit);
-                            // Server.js não implementa sort complexo na rota GET genérica, mas vamos enviar
-                            if(query.order) params.append('_sort', query.order.col); 
+                            
+                            // Separate filters: Server handles only 'eq'
+                            const serverFilters = query.filters.filter(f => !f.op || f.op === 'eq');
+                            serverFilters.forEach(f => params.append(f.col, f.val));
+                            
+                            // Only send limit if no client-side processing needed
+                            const hasClientFilters = query.filters.some(f => f.op && f.op !== 'eq');
+                            if(query.limit && !hasClientFilters && !query.order) {
+                                params.append('limit', query.limit);
+                            }
+                            
                             url += `?${params.toString()}`;
                         }
 
                         const res = await fetch(url, options);
-                        const data = await res.json();
+                        let data = await res.json();
                         
-                        // Formato de retorno do Supabase: { data, error }
-                        if (!res.ok) resolve({ data: null, error: { message: data.error || 'Erro' } });
-                        else resolve({ data: data, error: null });
+                        if (!res.ok) {
+                             resolve({ data: null, error: { message: data.error || 'Erro' } });
+                             return;
+                        }
+
+                        // Post-processing for Select (Client-side filtering/sorting)
+                        if (!query.insertData && !query.updateData && !query.upsertData && !query.isDelete) {
+                            // Client-side filtering
+                            const clientFilters = query.filters.filter(f => f.op && f.op !== 'eq');
+                            if (clientFilters.length > 0) {
+                                data = data.filter(row => {
+                                    return clientFilters.every(f => {
+                                        const val = row[f.col];
+                                        switch(f.op) {
+                                            case 'neq': return val != f.val;
+                                            case 'gt': return val > f.val;
+                                            case 'gte': return val >= f.val;
+                                            case 'lt': return val < f.val;
+                                            case 'lte': return val <= f.val;
+                                            case 'in': return Array.isArray(f.val) && f.val.includes(val);
+                                            default: return true;
+                                        }
+                                    });
+                                });
+                            }
+
+                            // Sort
+                            if (query.order) {
+                                const { col, ascending } = query.order;
+                                data.sort((a, b) => {
+                                    const va = a[col];
+                                    const vb = b[col];
+                                    if (va < vb) return ascending ? -1 : 1;
+                                    if (va > vb) return ascending ? 1 : -1;
+                                    return 0;
+                                });
+                            }
+
+                            // Limit (if not done on server)
+                            const hasClientFiltersOrSort = clientFilters.length > 0 || query.order;
+                            if (query.limit && hasClientFiltersOrSort) {
+                                data = data.slice(0, query.limit);
+                            }
+                            
+                            // Projection (.select)
+                            if (query.select && query.select !== '*') {
+                                const cols = query.select.split(',').map(c => c.trim());
+                                data = data.map(row => {
+                                    const newRow = {};
+                                    cols.forEach(c => {
+                                        if (row.hasOwnProperty(c)) newRow[c] = row[c];
+                                    });
+                                    return newRow;
+                                });
+                            }
+                        }
+
+                        resolve({ data: data, error: null });
                     } catch(e) {
                         resolve({ data: null, error: e });
                     }
