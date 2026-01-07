@@ -1,4 +1,5 @@
 const API_BASE_URL = 'https://checklist-server-nej7.onrender.com';
+console.log('Custom API Client v2.1 loaded (with .in support)');
 
 window.createApiClient = function() {
     return {
