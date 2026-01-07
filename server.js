@@ -237,8 +237,12 @@ app.post('/auth/signout', (req, res) => {
 // Database Endpoints
 app.get('/db/:table', async (req, res) => {
   try {
-    const { limit, ...filters } = req.query
-    const docs = await dbFind(req.params.table, filters, Number(limit) || 0)
+    const { limit, orderBy, orderDir, ...filters } = req.query
+    const sort = {}
+    if (orderBy) {
+        sort[orderBy] = orderDir === 'desc' ? -1 : 1
+    }
+    const docs = await dbFind(req.params.table, filters, Number(limit) || 0, sort)
     res.json(docs)
   } catch (e) {
     res.status(500).json({ error: e.message })
