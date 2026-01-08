@@ -275,13 +275,13 @@ export const useAppStore = create<AppState>()(
             })
             // Load data sequentially to ensure enrichment works
             // First load base data (equipments, checklists, access), then inspections
-            Promise.all([
+            Promise.allSettled([
                 get().loadEquipamentos(),
                 get().loadChecklists(),
                 get().loadAccessControls()
             ]).then(() => {
                 return get().loadInspections()
-            }).catch(err => console.error('Data load error:', err))
+            })
           } else {
             // No session, ensure logout
             if (get().isAuthenticated) {
@@ -532,6 +532,7 @@ export const useAppStore = create<AppState>()(
         } catch (error: any) {
           console.error('Load inspections error:', error)
           addLog(`[DEBUG] FATAL loadInspections: ${safeErr(error)}`)
+          get().notify({ message: 'Erro ao carregar dados. Verifique sua conexão.', type: 'error' })
           
           // Fallback to cache if everything fails
           if (cached.length > 0) {
