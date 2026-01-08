@@ -273,13 +273,15 @@ export const useAppStore = create<AppState>()(
               user: mapped,
               isAuthenticated: true,
             })
-            // Load data in background to avoid blocking UI
+            // Load data sequentially to ensure enrichment works
+            // First load base data (equipments, checklists, access), then inspections
             Promise.all([
-              get().loadEquipamentos(),
-              get().loadChecklists(),
-              get().loadInspections(),
-              get().loadAccessControls()
-            ]).catch(err => console.error('Data load error:', err))
+                get().loadEquipamentos(),
+                get().loadChecklists(),
+                get().loadAccessControls()
+            ]).then(() => {
+                return get().loadInspections()
+            }).catch(err => console.error('Data load error:', err))
           } else {
             // No session, ensure logout
             if (get().isAuthenticated) {
