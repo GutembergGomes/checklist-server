@@ -10,7 +10,7 @@ type SingleResult<T> = { data: T | null; error: Error | null }
 type UpsertResult<T> = { data: T[] | null; error: Error | null }
 type InsertResult<T> = { data: T[] | null; error: Error | null }
 
-const API_URL = import.meta.env.VITE_API_URL || ''
+const API_URL = import.meta.env.VITE_API_URL || 'https://checklist-server-nej7.onrender.com'
 
 function getToken() {
   try {
