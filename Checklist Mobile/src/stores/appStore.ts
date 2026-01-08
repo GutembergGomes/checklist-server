@@ -374,12 +374,15 @@ export const useAppStore = create<AppState>()(
               
               addLog(`[DEBUG] Retorno servidor: ${data1.length} inspections, ${data2.length} respostas`)
               
-              // Only mark as success if NO errors occurred
-              if (!res1.error && !res2.error && results[0].status === 'fulfilled' && results[1].status === 'fulfilled') {
+              // RELAXED SUCCESS CHECK: If we got inspections (res1), we show them even if answers (res2) failed
+              if (!res1.error && results[0].status === 'fulfilled') {
                   serverSuccess = true
+                  if (res2.error) {
+                      addLog(`[WARN] Falha ao carregar respostas (detalhes), mas mostrando inspeções: ${safeErr(res2.error)}`)
+                  }
               } else {
                   serverSuccess = false
-                  addLog('[DEBUG] Erro na comunicação com servidor detectado.')
+                  addLog('[DEBUG] Erro na comunicação com servidor (inspeções falharam).')
               }
               
           } catch (e: any) {
