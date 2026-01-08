@@ -26,13 +26,26 @@ async function request(path: string, init: RequestInit = {}) {
   }
   const token = getToken()
   if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(text || `HTTP ${res.status}`)
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000) // 15s timeout
+
+  try {
+    const res = await fetch(`${API_URL}${path}`, { ...init, headers, signal: controller.signal })
+    clearTimeout(timeoutId)
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(text || `HTTP ${res.status}`)
+    }
+    const json = await res.json().catch(() => null)
+    return json
+  } catch (error: any) {
+    clearTimeout(timeoutId)
+    if (error.name === 'AbortError') {
+      throw new Error('Tempo limite da requisição excedido (15s)')
+    }
+    throw error
   }
-  const json = await res.json().catch(() => null)
-  return json
 }
 
 class QueryBuilder<T> {

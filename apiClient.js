@@ -1,6 +1,23 @@
 const API_BASE_URL = 'https://checklist-server-nej7.onrender.com';
 console.log('Custom API Client v2.3 loaded (Render Production)');
 
+async function fetchWithTimeout(url, options = {}) {
+    const { timeout = 15000, ...fetchOptions } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(url, { ...fetchOptions, signal: controller.signal });
+        clearTimeout(id);
+        return response;
+    } catch (error) {
+        clearTimeout(id);
+        if (error.name === 'AbortError') {
+             throw new Error('Tempo limite excedido (15s)');
+        }
+        throw error;
+    }
+}
+
 window.createApiClient = function() {
     return {
         auth: {
@@ -168,7 +185,7 @@ window.createApiClient = function() {
                             url += `?${params.toString()}`;
                         }
 
-                        const res = await fetch(url, options);
+                        const res = await fetchWithTimeout(url, options);
                         let data = await res.json();
                         
                         if (!res.ok) {

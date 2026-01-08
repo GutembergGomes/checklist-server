@@ -6778,43 +6778,49 @@
             savingInspection = true;
             const saveBtns = Array.from(document.querySelectorAll('button[onclick="saveIrrInspection()"]'));
             saveBtns.forEach(b => { b.disabled = true; });
-            irrCurrentInspection.data = date;
-            irrCurrentInspection.mecanico = mech;
-            irrCurrentInspection.frota = frota;
-            irrCurrentInspection.created_at = new Date().toISOString();
-            irrCurrentInspection.local_id = 'irr_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-            const user = (typeof currentUser !== 'undefined' && currentUser) || getCachedUser() || getOfflineUser();
-            const isAuthenticated = !!(user && user.id && user.id !== 'offline');
-            const record = JSON.parse(JSON.stringify(irrCurrentInspection));
-            record.user_id = user && user.id ? user.id : null;
-            const dbInspection = { data: record.data, tipo: record.tipo, frota: record.frota, mecanico: record.mecanico, observacao: record.observacao, items: record.items, results: record.results, user_id: record.user_id, created_at: record.created_at, local_id: record.local_id };
-            let savedOnline = false;
-            if (isOnline() && isAuthenticated) {
-                try {
-                    const { data: upData, error } = await supabase
-                        .from('irrig_inspections')
-                        .upsert([dbInspection], { onConflict: 'local_id' })
-                        .select();
-                    if (!error && upData && upData[0]) { record.id = upData[0].id; savedOnline = true; }
-                } catch (_) {}
+            try {
+                irrCurrentInspection.data = date;
+                irrCurrentInspection.mecanico = mech;
+                irrCurrentInspection.frota = frota;
+                irrCurrentInspection.created_at = new Date().toISOString();
+                irrCurrentInspection.local_id = 'irr_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+                const user = (typeof currentUser !== 'undefined' && currentUser) || getCachedUser() || getOfflineUser();
+                const isAuthenticated = !!(user && user.id && user.id !== 'offline');
+                const record = JSON.parse(JSON.stringify(irrCurrentInspection));
+                record.user_id = user && user.id ? user.id : null;
+                const dbInspection = { data: record.data, tipo: record.tipo, frota: record.frota, mecanico: record.mecanico, observacao: record.observacao, items: record.items, results: record.results, user_id: record.user_id, created_at: record.created_at, local_id: record.local_id };
+                let savedOnline = false;
+                if (isOnline() && isAuthenticated) {
+                    try {
+                        const { data: upData, error } = await supabase
+                            .from('irrig_inspections')
+                            .upsert([dbInspection], { onConflict: 'local_id' })
+                            .select();
+                        if (!error && upData && upData[0]) { record.id = upData[0].id; savedOnline = true; }
+                    } catch (_) {}
+                }
+                if (!savedOnline) { record.id = record.local_id; queueIrrInspection(dbInspection); }
+                const existingIdx = Array.isArray(irrigInspections) ? irrigInspections.findIndex(i => String(i.local_id) === String(record.local_id)) : -1;
+                if (existingIdx >= 0) irrigInspections[existingIdx] = record; else irrigInspections.push(record);
+                setCachedIrrInspections(irrigInspections);
+                renderIrrHistory();
+                updateStats();
+                if (savedOnline) {
+                    try { await supabase.from('system_events').insert([{ type:'new_inspection', title:'Nova inspeção (Irrigação)', message: `${record.tipo||''} • ${record.frota||''} • ${record.mecanico||''}`, payload: { tipo: record.tipo||'', frota: record.frota||'', mecanico: record.mecanico||'', data: record.data||'', id: record.id||'', local_id: record.local_id||'', modulo: 'irr' } }]); } catch(_) {}
+                    try { systemBroadcastChannel && systemBroadcastChannel.send({ type:'broadcast', event:'new_inspection', payload: { modulo:'irr', tipo: record.tipo||'', frota: record.frota||'', mecanico: record.mecanico||'', data: record.data||'', id: record.id||'', local_id: record.local_id||'' } }); } catch(_) {}
+                }
+                try { pushNotification('info', 'Nova inspeção (Irrigação)', record.frota ? `Inspeção lançada para ${record.frota}` : 'Inspeção lançada', { modulo:'irr', tipo: record.tipo||'', frota: record.frota||'', mecanico: record.mecanico||'', data: record.data||'', id: record.id||'', local_id: record.local_id||'' }); } catch(_) {}
+                showFloatingNotification('success', 'Inspeção de irrigação salva!');
+                showIrrSubsection('historico');
+                try { localStorage.removeItem('irrDraft'); } catch(_) {}
+            } catch (e) {
+                console.error(e);
+                showCustomAlert('Erro ao salvar: ' + (e.message || 'Erro desconhecido'));
+            } finally {
+                savingInspection = false;
+                saveBtns.forEach(b => { b.disabled = false; });
+                showLoading(false);
             }
-            if (!savedOnline) { record.id = record.local_id; queueIrrInspection(dbInspection); }
-            const existingIdx = Array.isArray(irrigInspections) ? irrigInspections.findIndex(i => String(i.local_id) === String(record.local_id)) : -1;
-            if (existingIdx >= 0) irrigInspections[existingIdx] = record; else irrigInspections.push(record);
-            setCachedIrrInspections(irrigInspections);
-            renderIrrHistory();
-            updateStats();
-            if (savedOnline) {
-                try { await supabase.from('system_events').insert([{ type:'new_inspection', title:'Nova inspeção (Irrigação)', message: `${record.tipo||''} • ${record.frota||''} • ${record.mecanico||''}`, payload: { tipo: record.tipo||'', frota: record.frota||'', mecanico: record.mecanico||'', data: record.data||'', id: record.id||'', local_id: record.local_id||'', modulo: 'irr' } }]); } catch(_) {}
-                try { systemBroadcastChannel && systemBroadcastChannel.send({ type:'broadcast', event:'new_inspection', payload: { modulo:'irr', tipo: record.tipo||'', frota: record.frota||'', mecanico: record.mecanico||'', data: record.data||'', id: record.id||'', local_id: record.local_id||'' } }); } catch(_) {}
-            }
-            try { pushNotification('info', 'Nova inspeção (Irrigação)', record.frota ? `Inspeção lançada para ${record.frota}` : 'Inspeção lançada', { modulo:'irr', tipo: record.tipo||'', frota: record.frota||'', mecanico: record.mecanico||'', data: record.data||'', id: record.id||'', local_id: record.local_id||'' }); } catch(_) {}
-            showFloatingNotification('success', 'Inspeção de irrigação salva!');
-            showIrrSubsection('historico');
-            try { localStorage.removeItem('irrDraft'); } catch(_) {}
-            savingInspection = false;
-            saveBtns.forEach(b => { b.disabled = false; });
-            showLoading(false);
         }
 
         function populateIrrEquipmentList() {
