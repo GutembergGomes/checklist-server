@@ -35,7 +35,11 @@ const notifyNative = async (title: string, body?: string) => {
   }
 }
 
-  interface AppState {
+const getRole = (email: string): 'admin' | 'tecnico' => {
+  return email === 'gutemberggg10@gmail.com' ? 'admin' : 'tecnico'
+}
+
+interface AppState {
   // Auth state
   user: Usuario | null
   isAuthenticated: boolean
@@ -141,7 +145,7 @@ export const useAppStore = create<AppState>()(
               id: data.user.id,
               email: data.user.email || '',
               nome: (data.user.user_metadata && (data.user.user_metadata.name || data.user.user_metadata.full_name)) || (data.user.email || 'Usuário'),
-              role: 'tecnico',
+              role: getRole(data.user.email || ''),
               ativo: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -169,7 +173,7 @@ export const useAppStore = create<AppState>()(
               id: 'offline-user',
               email: email || 'offline@local',
               nome: (email && (email.split('@')[0] || email)) || 'Usuário',
-              role: 'tecnico',
+              role: getRole(email || 'offline@local'),
               ativo: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -211,7 +215,7 @@ export const useAppStore = create<AppState>()(
               id: data.user.id,
               email: data.user.email || '',
               nome: (data.user.user_metadata && (data.user.user_metadata.name || data.user.user_metadata.full_name)) || (data.user.email || 'Usuário'),
-              role: 'tecnico',
+              role: getRole(data.user.email || ''),
               ativo: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -222,6 +226,8 @@ export const useAppStore = create<AppState>()(
               isAuthenticated: true,
               isLoading: false 
             })
+
+            notify({ message: 'Cadastro realizado com sucesso! Bem-vindo.', type: 'success' })
             
             await get().loadEquipamentos()
             await get().loadChecklists()
@@ -264,7 +270,7 @@ export const useAppStore = create<AppState>()(
               id: session.user.id,
               email: session.user.email || '',
               nome: (session.user.user_metadata && (session.user.user_metadata.name || session.user.user_metadata.full_name)) || (session.user.email || 'Usuário'),
-              role: 'tecnico',
+              role: getRole(session.user.email || ''),
               ativo: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
