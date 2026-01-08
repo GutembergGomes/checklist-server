@@ -511,6 +511,9 @@ export const useAppStore = create<AppState>()(
 
               addLog(`[DEBUG] Total final: ${merged.length}`)
               set({ inspections: merged })
+              if (merged.length > 0) {
+                 get().notify({ message: `Dados carregados: ${merged.length} registros`, type: 'success' })
+              }
           } catch (e: any) {
               addLog(`[DEBUG] Erro merge final: ${safeErr(e)}`)
               // If merge fails, try to show at least something
