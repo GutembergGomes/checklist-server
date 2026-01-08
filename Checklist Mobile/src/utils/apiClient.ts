@@ -221,9 +221,11 @@ class QueryBuilder<T> {
       }
       else if (this.operation === 'upsert') {
         const payloadRaw = Array.isArray(this.body) ? this.body : [this.body]
-          // Don't strip created_at - let server handle it (server uses $setOnInsert)
-          // keeping it allows preserving client-side timestamp if set
-          const payload = payloadRaw
+          // Strip created_at to avoid ConflictingUpdateOperators if server puts it in $set
+          const payload = payloadRaw.map((it: any) => {
+            const { created_at, ...rest } = it || {}
+            return rest
+          })
           const data: T[] = await request(`/db/${this.table}/upsert`, {
            method: 'POST',
            body: JSON.stringify({ data: payload, onConflict: this.upsertOptions?.onConflict })

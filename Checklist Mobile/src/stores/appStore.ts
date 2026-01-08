@@ -308,8 +308,8 @@ export const useAppStore = create<AppState>()(
 
           // 2. Fetch fresh data from server (both tables)
           const [q1, q2] = await Promise.all([
-             api.from('inspections').select('*').order('created_at', { ascending: false }).limit(300),
-             api.from('respostas_checklist').select('*').order('created_at', { ascending: false }).limit(300)
+             api.from('inspections').select('*').order('created_at', { ascending: false }),
+             api.from('respostas_checklist').select('*').order('created_at', { ascending: false })
           ])
 
           const data1 = Array.isArray(q1.data) ? q1.data : []
@@ -764,7 +764,7 @@ export const useAppStore = create<AppState>()(
                 mecanico: mecanicoNome,
                 local_id: response.id,
                 id: response.id, // Ensure canonical ID is sent
-                created_at: new Date().toISOString(),
+                // created_at removed to avoid conflict
               }
               const retry = async (fn: ()=>Promise<any>, attempts=3) => {
                 let lastErr

@@ -5048,13 +5048,11 @@
                     const fetchIns = supabase
                         .from('inspections')
                         .select('id,data,tipo,frota,mecanico,observacao,items,results,created_at,local_id')
-                        .order('created_at', { ascending: false })
-                        .limit(300);
+                        .order('created_at', { ascending: false });
                     const fetchIrr = supabase
                         .from('irrig_inspections')
                         .select('id,data,tipo,frota,mecanico,observacao,items,results,created_at,local_id')
-                        .order('created_at', { ascending: false })
-                        .limit(300);
+                        .order('created_at', { ascending: false });
                     const [resp, respIrr] = await Promise.allSettled([fetchIns, fetchIrr]);
                     if (resp.status === 'fulfilled' && !resp.value.error) {
                         const data = dedupeInspections(resp.value.data || []);
@@ -6800,7 +6798,7 @@
                 const isAuthenticated = !!(user && user.id && user.id !== 'offline');
                 const record = JSON.parse(JSON.stringify(irrCurrentInspection));
                 record.user_id = user && user.id ? user.id : null;
-                const dbInspection = { data: record.data, tipo: record.tipo, frota: record.frota, mecanico: record.mecanico, observacao: record.observacao, items: record.items, results: record.results, user_id: record.user_id, created_at: record.created_at, local_id: record.local_id };
+                const dbInspection = { data: record.data, tipo: record.tipo, frota: record.frota, mecanico: record.mecanico, observacao: record.observacao, items: record.items, results: record.results, user_id: record.user_id, local_id: record.local_id };
                 let savedOnline = false;
                 if (isOnline() && isAuthenticated) {
                     try {

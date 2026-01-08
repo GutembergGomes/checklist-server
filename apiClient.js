@@ -1,4 +1,5 @@
 const API_BASE_URL = 'https://checklist-server-nej7.onrender.com';
+// const API_BASE_URL = 'http://localhost:8080'; // Local Server
 console.log('Custom API Client v2.3 loaded (Render Production)');
 
 async function fetchWithTimeout(url, options = {}) {
@@ -216,9 +217,16 @@ window.createApiClient = function() {
                             const serverFilters = query.filters.filter(f => !f.op || f.op === 'eq');
                             serverFilters.forEach(f => params.append(f.col, f.val));
                             
-                            // Only send limit if no client-side processing needed
+                            // Send Order By to server
+                            if (query.order) {
+                                params.append('orderBy', query.order.col);
+                                params.append('orderDir', query.order.ascending ? 'asc' : 'desc');
+                            }
+                            
+                            // Only send limit if no client-side processing needed (complex filters)
+                            // We can send limit if server handles sort
                             const hasClientFilters = query.filters.some(f => f.op && f.op !== 'eq');
-                            if(query.limit && !hasClientFilters && !query.order) {
+                            if(query.limit && !hasClientFilters) {
                                 params.append('limit', query.limit);
                             }
                             
