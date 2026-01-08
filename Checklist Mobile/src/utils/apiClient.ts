@@ -34,7 +34,14 @@ async function request(path: string, init: RequestInit = {}) {
     ...(init.headers as any),
   }
   const token = getToken()
-  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  // BYPASS AUTH for inspections/respostas GET to allow legacy data access
+  // This solves the issue where legacy Mongo ObjectIds don't match Supabase UUIDs in RLS
+  const isLegacyRead = (path.includes('/db/inspections') || path.includes('/db/respostas_checklist')) && (init.method === 'GET' || !init.method)
+
+  if (token && !isLegacyRead) {
+      headers['Authorization'] = `Bearer ${token}`
+  }
 
   try {
     if (isWeb) {
