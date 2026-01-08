@@ -6,7 +6,7 @@ import { Browser } from '@capacitor/browser'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 
-const supabase = createApiClient()
+const api = createApiClient()
 
 function ConfiguracoesPage() {
   const [usage, setUsage] = useState<{ used: number; quota: number; percentage: number }>({ used: 0, quota: 0, percentage: 0 })
@@ -44,7 +44,7 @@ function ConfiguracoesPage() {
           <button
             onClick={async () => {
               try {
-                const { data, error } = await supabase
+                const { data, error } = await api
                   .from('app_updates')
                   .select('*')
                   .order('created_at', { ascending: false })
@@ -66,7 +66,7 @@ function ConfiguracoesPage() {
           <button
             onClick={async () => {
               try {
-                const { data } = await supabase
+                const { data } = await api
                   .from('app_updates')
                   .select('apk_url')
                   .order('created_at', { ascending: false })

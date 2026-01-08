@@ -190,6 +190,39 @@ app.get('/', (req, res) => res.json({ status: 'online', mode: db ? 'mongodb' : '
 // Auth (Persistent via MongoDB)
 // const sessions = new Map() // REMOVED: In-memory sessions cause disconnects on restart
 
+function sanitizeUser(user) {
+  if (!user || typeof user !== 'object') return user
+  const { password, ...safe } = user
+  return safe
+}
+
+async function getSessionFromRequest(req) {
+  const auth = req.headers['authorization'] || ''
+  const token = String(auth).startsWith('Bearer ') ? String(auth).slice('Bearer '.length) : String(auth)
+  if (!token) return null
+  const sessionsList = await dbFind('sessions', { token })
+  return sessionsList[0] || null
+}
+
+function requireAuth(handler) {
+  return async (req, res) => {
+    try {
+      const sess = await getSessionFromRequest(req)
+      if (!sess || !sess.user) return res.status(401).json({ error: 'Unauthorized' })
+      req.user = sess.user
+      req.session = sess
+      return handler(req, res)
+    } catch (e) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+  }
+}
+
+function isAdminUser(user) {
+  const adminEmail = process.env.ADMIN_EMAIL || 'gutemberggg10@gmail.com'
+  return !!(user && user.email && String(user.email).toLowerCase() === String(adminEmail).toLowerCase())
+}
+
 app.post('/auth/signup', async (req, res) => {
   const { email, password, options } = req.body
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
@@ -226,11 +259,11 @@ app.post('/auth/signup', async (req, res) => {
         id: crypto.randomUUID(),
         token, 
         user_id: user.id, 
-        user, 
+        user: sanitizeUser(user), 
         created_at: new Date().toISOString() 
     })
     
-    res.json({ token, user })
+    res.json({ token, user: sanitizeUser(user) })
   } catch (e) {
     console.error('Signup error:', e)
     res.status(500).json({ error: 'Signup failed' })
@@ -271,11 +304,11 @@ app.post('/auth/signin', async (req, res) => {
         id: crypto.randomUUID(),
         token, 
         user_id: user.id, 
-        user, 
+        user: sanitizeUser(user), 
         created_at: new Date().toISOString() 
     })
     
-    res.json({ token, user })
+    res.json({ token, user: sanitizeUser(user) })
   } catch (e) {
     console.error('Login error:', e)
     res.status(500).json({ error: 'Login failed' })
@@ -283,81 +316,122 @@ app.post('/auth/signin', async (req, res) => {
 })
 
 app.get('/auth/session', async (req, res) => {
-  const auth = req.headers['authorization'] || ''
-  const token = auth.replace('Bearer ', '')
-  
   try {
-      const sessionsList = await dbFind('sessions', { token })
-      const sess = sessionsList[0]
+      const sess = await getSessionFromRequest(req)
       res.json({ user: sess ? sess.user : null })
   } catch (e) {
       res.json({ user: null })
   }
 })
 
-app.post('/auth/signout', async (req, res) => {
-  const auth = req.headers['authorization'] || ''
-  const token = auth.replace('Bearer ', '')
-  
+app.post('/auth/signout', requireAuth(async (req, res) => {
   try {
-      const sessionsList = await dbFind('sessions', { token })
-      if (sessionsList.length > 0) {
-          await dbDelete('sessions', sessionsList[0].id)
-      }
+    if (req.session?.id) await dbDelete('sessions', req.session.id)
   } catch(e) {}
-  
   res.json({ ok: true })
-})
+}))
 
 // Database Endpoints
-app.get('/db/:table', async (req, res) => {
+app.get('/db/:table', requireAuth(async (req, res) => {
   try {
     const { limit, orderBy, orderDir, ...filters } = req.query
     const sort = {}
     if (orderBy) {
         sort[orderBy] = orderDir === 'desc' ? -1 : 1
     }
-    const docs = await dbFind(req.params.table, filters, Number(limit) || 0, sort)
+    const table = req.params.table
+    const user = req.user
+
+    if (table === 'sessions' && !isAdminUser(user)) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    if (table === 'users' && !isAdminUser(user)) {
+      const wantsId = filters.id != null && String(filters.id) === String(user.id)
+      const wantsEmail = filters.email != null && String(filters.email).toLowerCase() === String(user.email || '').toLowerCase()
+      if (Object.keys(filters).length > 0 && !(wantsId || wantsEmail)) {
+        return res.status(403).json({ error: 'Forbidden' })
+      }
+      if (Object.keys(filters).length === 0) {
+        filters.id = user.id
+      }
+    }
+
+    let docs = await dbFind(table, filters, Number(limit) || 0, sort)
+    if (table === 'users') {
+      const safe = (Array.isArray(docs) ? docs : [docs]).map(sanitizeUser)
+      return res.json(safe)
+    }
     res.json(docs)
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
-})
+}))
 
-app.post('/db/:table/insert', async (req, res) => {
+app.post('/db/:table/insert', requireAuth(async (req, res) => {
   try {
+    const table = req.params.table
+    const user = req.user
+    if (table === 'sessions' && !isAdminUser(user)) return res.status(403).json({ error: 'Forbidden' })
+    if (table === 'users' && !isAdminUser(user)) return res.status(403).json({ error: 'Forbidden' })
     const { data } = req.body
-    const result = await dbInsert(req.params.table, data)
+    const result = await dbInsert(table, data)
+    if (table === 'users') {
+      const safe = (Array.isArray(result) ? result : [result]).map(sanitizeUser)
+      return res.json(safe)
+    }
     res.json(result)
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
-})
+}))
 
-app.post('/db/:table/upsert', async (req, res) => {
+app.post('/db/:table/upsert', requireAuth(async (req, res) => {
   try {
+    const table = req.params.table
+    const user = req.user
+    if (table === 'sessions' && !isAdminUser(user)) return res.status(403).json({ error: 'Forbidden' })
+    if (table === 'users' && !isAdminUser(user)) {
+      const { data } = req.body || {}
+      const rows = Array.isArray(data) ? data : [data]
+      const allSelf = rows.every((r) => {
+        if (!r) return false
+        if (r.id && String(r.id) !== String(user.id)) return false
+        if (r.email && String(r.email).toLowerCase() !== String(user.email || '').toLowerCase()) return false
+        return true
+      })
+      if (!allSelf) return res.status(403).json({ error: 'Forbidden' })
+    }
     const { data, onConflict } = req.body
     if (!data) return res.status(400).json({ error: 'Missing data payload' })
-    const result = await dbUpsert(req.params.table, data, onConflict)
+    const result = await dbUpsert(table, data, onConflict)
+    if (table === 'users') {
+      const safe = (Array.isArray(result) ? result : [result]).map(sanitizeUser)
+      return res.json(safe)
+    }
     res.json(result)
   } catch (e) {
     console.error('Upsert error:', e)
     res.status(500).json({ error: e.message })
   }
-})
+}))
 
-app.delete('/db/:table/:id', async (req, res) => {
+app.delete('/db/:table/:id', requireAuth(async (req, res) => {
   try {
-    const result = await dbDelete(req.params.table, req.params.id)
+    const table = req.params.table
+    const user = req.user
+    if (table === 'sessions' && !isAdminUser(user)) return res.status(403).json({ error: 'Forbidden' })
+    if (table === 'users' && !isAdminUser(user)) return res.status(403).json({ error: 'Forbidden' })
+    const result = await dbDelete(table, req.params.id)
     res.json(result)
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
-})
+}))
 
 // Storage Routes
 // Handle raw body upload (apiClient sends body: file)
-app.post('/storage/upload', (req, res) => {
+app.post('/storage/upload', requireAuth((req, res) => {
   const bucket = req.query.bucket
   const filePath = req.query.path
   
@@ -385,12 +459,12 @@ app.post('/storage/upload', (req, res) => {
   
   writeStream.on('finish', () => res.json({ key: `${bucket}/${filePath}` }))
   writeStream.on('error', (e) => res.status(500).json({ error: e.message }))
-})
+}))
 
 // Legacy raw route (can be removed if client uses above)
-app.post('/storage/upload_raw', (req, res) => {
+app.post('/storage/upload_raw', requireAuth((req, res) => {
   res.redirect(307, `/storage/upload?bucket=${req.query.bucket}&path=${req.query.path}`)
-})
+}))
 
 
 app.get('/storage/file/:bucket/*', (req, res) => {

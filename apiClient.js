@@ -64,14 +64,54 @@ window.createApiClient = function() {
                 }
             },
             signOut: async () => {
+                try {
+                    const token = localStorage.getItem('checklist-auth-token');
+                    if (token) {
+                        await fetchWithTimeout(`${API_BASE_URL}/auth/signout`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                    }
+                } catch (_) {}
                 localStorage.removeItem('checklist-auth-token');
+                localStorage.removeItem('checklist-user-data');
                 return { error: null };
             },
             getSession: async () => {
                 const token = localStorage.getItem('checklist-auth-token');
                 if (!token) return { data: { session: null }, error: null };
-                // O ideal seria validar o token no servidor, mas para mock local:
-                return { data: { session: { access_token: token, user: { email: 'user@local' } } }, error: null };
+                try {
+                    const res = await fetchWithTimeout(`${API_BASE_URL}/auth/session`, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        return { data: { session: null }, error: null };
+                    }
+                    if (data && data.user) {
+                        try { localStorage.setItem('checklist-user-data', JSON.stringify(data.user)); } catch (_) {}
+                        return { data: { session: { access_token: token, user: data.user } }, error: null };
+                    }
+                    return { data: { session: null }, error: null };
+                } catch (e) {
+                    try {
+                        const cached = localStorage.getItem('checklist-user-data') || localStorage.getItem('currentUser');
+                        const user = cached ? JSON.parse(cached) : null;
+                        if (user) return { data: { session: { access_token: token, user } }, error: null };
+                    } catch (_) {}
+                    return { data: { session: null }, error: null };
+                }
+            },
+            setSession: async ({ access_token }) => {
+                try {
+                    if (access_token) {
+                        localStorage.setItem('checklist-auth-token', access_token);
+                    }
+                    return await window.createApiClient().auth.getSession();
+                } catch (e) {
+                    return { data: { session: null }, error: { message: e.message } };
+                }
             },
             updateUser: async (data) => {
                 return { data: { user: { ...data } }, error: null };
@@ -189,6 +229,11 @@ window.createApiClient = function() {
                         let data = await res.json();
                         
                         if (!res.ok) {
+                             if (res.status === 401) {
+                                 try { localStorage.removeItem('checklist-auth-token'); } catch (_) {}
+                                 try { localStorage.removeItem('checklist-user-data'); } catch (_) {}
+                                 try { localStorage.removeItem('currentUser'); } catch (_) {}
+                             }
                              resolve({ data: null, error: { message: data.error || 'Erro' } });
                              return;
                         }

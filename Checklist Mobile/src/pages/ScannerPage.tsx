@@ -8,7 +8,7 @@ import { defaultMotivos, getDefaultItems } from '../utils/checklistTemplates'
 import { normalizeItems } from '../utils/itemNormalize'
 import { buildLegacyItems, legacyTemplates } from '../utils/legacyTemplates'
 
-const supabase = createApiClient()
+const api = createApiClient()
 
 function ScannerPage() {
   const navigate = useNavigate()
@@ -25,9 +25,9 @@ function ScannerPage() {
     ;(async () => {
       try {
         const tipos = new Set<string>()
-        const { data: insp } = await supabase.from('inspections').select('tipo')
+        const { data: insp } = await api.from('inspections').select('tipo')
         ;(insp || []).forEach((r: any) => r?.tipo && tipos.add(String(r.tipo)))
-        const { data: irr } = await supabase.from('irrig_inspections').select('tipo')
+        const { data: irr } = await api.from('irrig_inspections').select('tipo')
         ;(irr || []).forEach((r: any) => r?.tipo && tipos.add(String(r.tipo)))
         setMotivos(defaultMotivos)
       } catch {}
@@ -104,7 +104,7 @@ function ScannerPage() {
         items = getDefaultItems(motivo)
       }
       try {
-        const { data: tmpl } = await supabase
+        const { data: tmpl } = await api
           .from('inspections')
           .select('items')
           .eq('tipo', motivo)
@@ -119,7 +119,7 @@ function ScannerPage() {
       } catch {}
       if (!items || items.length === 0) {
         try {
-          const { data: ctrl } = await supabase
+          const { data: ctrl } = await api
             .from('controle_3p')
             .select('header,rows')
             .eq('local_id', selecionado.codigo)
@@ -134,7 +134,7 @@ function ScannerPage() {
       }
       if (!items || items.length === 0) {
         try {
-          const { data: cal } = await supabase
+          const { data: cal } = await api
             .from('calibragem')
             .select('header,rows,pos,sulco,calibragem')
             .eq('local_id', selecionado.codigo)

@@ -8,8 +8,7 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import { tanquesData } from '../utils/tankData'
 
 // Initialize API client
-const supabase = createApiClient()
-const supabaseConfigured = true
+const api = createApiClient()
 
 const notify = (detail: { message: string; type?: 'success' | 'error' | 'info' | 'warning'; duration?: number }) => {
   try {
@@ -102,7 +101,7 @@ export const useAppStore = create<AppState>()(
       // Auth actions
       resetPasswordForEmail: async (email: string) => {
         try {
-           const { error } = await supabase.auth.resetPasswordForEmail(email, {
+           const { error } = await api.auth.resetPasswordForEmail(email, {
              // Redirecionar para o site web de recuperação
              // Ajuste esta URL para o seu site de produção
              redirectTo: 'https://gutemberggomes.github.io/CheckList/reset-password.html' 
@@ -116,7 +115,7 @@ export const useAppStore = create<AppState>()(
         try {
           set({ isLoading: true })
           
-          const { data, error } = await supabase.auth.signInWithPassword({
+          const { data, error } = await api.auth.signInWithPassword({
             email,
             password,
           })
@@ -186,7 +185,7 @@ export const useAppStore = create<AppState>()(
         try {
           set({ isLoading: true })
           
-          const { data, error } = await supabase.auth.signUp({
+          const { data, error } = await api.auth.signUp({
             email,
             password,
           })
@@ -228,7 +227,7 @@ export const useAppStore = create<AppState>()(
 
       logout: async () => {
         try {
-          await supabase.auth.signOut()
+          await api.auth.signOut()
           set({
             user: null,
             isAuthenticated: false,
@@ -242,7 +241,7 @@ export const useAppStore = create<AppState>()(
 
       checkAuth: async () => {
         try {
-          const { data: { session }, error } = await supabase.auth.getSession()
+          const { data: { session }, error } = await api.auth.getSession()
           
           if (error) throw error
 
@@ -309,8 +308,8 @@ export const useAppStore = create<AppState>()(
 
           // 2. Fetch fresh data from server (both tables)
           const [q1, q2] = await Promise.all([
-             supabase.from('inspections').select('*').order('created_at', { ascending: false }).limit(300),
-             supabase.from('respostas_checklist').select('*').order('created_at', { ascending: false }).limit(300)
+             api.from('inspections').select('*').order('created_at', { ascending: false }).limit(300),
+             api.from('respostas_checklist').select('*').order('created_at', { ascending: false }).limit(300)
           ])
 
           const data1 = Array.isArray(q1.data) ? q1.data : []
@@ -427,7 +426,7 @@ export const useAppStore = create<AppState>()(
         try {
           const email = get().user?.email
           if (!email) { set({ allowedSections: [] }); return }
-          const { data, error } = await supabase
+          const { data, error } = await api
             .from('access_controls')
             .select('allowed_sections')
             .eq('email', email)
@@ -466,7 +465,7 @@ export const useAppStore = create<AppState>()(
           }
 
           // Tenta tabela original do site: 'equipments'
-          const { data: eq1, error: err1 } = await supabase
+          const { data: eq1, error: err1 } = await api
             .from('equipments')
             .select('*')
             .order('frota', { ascending: true })
@@ -492,7 +491,7 @@ export const useAppStore = create<AppState>()(
           }
           
           // Tenta tabela 'equipamentos' (Português - Migration 001)
-          const { data: eqPt, error: errPt } = await supabase
+          const { data: eqPt, error: errPt } = await api
             .from('equipamentos')
             .select('*')
             .order('codigo', { ascending: true }) // codigo é o equivalente a frota
@@ -517,7 +516,7 @@ export const useAppStore = create<AppState>()(
             return
           }
 
-          const { data: eqAlt, error: errAlt } = await supabase
+          const { data: eqAlt, error: errAlt } = await api
             .from('irrig_equipments')
             .select('*')
             .order('frota', { ascending: true })
@@ -553,7 +552,7 @@ export const useAppStore = create<AppState>()(
             try {
               await new Promise((r) => setTimeout(r, 600))
               await offlineStorage.init()
-              const { data: eq2, error: err2 } = await supabase
+              const { data: eq2, error: err2 } = await api
                 .from('equipments')
                 .select('*')
                 .order('frota', { ascending: true })
@@ -574,7 +573,7 @@ export const useAppStore = create<AppState>()(
                 await offlineStorage.replaceEquipamentos(mapped)
                 return
               }
-              const { data: eq3, error: err3 } = await supabase
+              const { data: eq3, error: err3 } = await api
                 .from('irrig_equipments')
                 .select('*')
                 .order('frota', { ascending: true })
@@ -632,7 +631,7 @@ export const useAppStore = create<AppState>()(
           const sinceIso = new Date(now - windowMs).toISOString()
           const onlineDuplicateCheck = async () => {
             try {
-              const { data, error } = await supabase
+              const { data, error } = await api
                 .from('inspections')
                 .select('id')
                 .eq('tipo', tipoPayload)
@@ -669,9 +668,9 @@ export const useAppStore = create<AppState>()(
               if (typeof val === 'string' && val.startsWith('data:')) {
                 const blob = toBlob(val)
                 const path = `photos/${response.id}/${it.id}-${timestamp}.jpg`
-                const up = await supabase.storage.from('app').upload(path, blob, { upsert: true })
+                const up = await api.storage.from('app').upload(path, blob, { upsert: true })
                 if (!up.error) {
-                  const publicUrl = `${supabase.storage.from('app').getPublicUrl(path).data.publicUrl}`
+                  const publicUrl = `${api.storage.from('app').getPublicUrl(path).data.publicUrl}`
                   // persist foto separadamente
                   await offlineStorage.saveFoto({ id: `${response.id}-${it.id}-${timestamp}`, resposta_id: response.id, url: publicUrl, created_at: new Date().toISOString() } as any)
                   // também atualiza valor no array
@@ -776,7 +775,7 @@ export const useAppStore = create<AppState>()(
                 }
                 return { error: lastErr || new Error('Upsert failed') }
               }
-              const upsertCall = () => supabase.from('inspections').upsert(payload, { onConflict: 'id' })
+              const upsertCall = () => api.from('inspections').upsert(payload, { onConflict: 'id' })
               const { error, data: upsertData } = await retry(upsertCall)
               if (!error) {
                 await offlineStorage.saveResposta({ ...response, sincronizado: true }, true)
@@ -865,12 +864,12 @@ export const useAppStore = create<AppState>()(
               
               if (isUuid) {
                  // Try deleting from 'inspections' table
-                 const { error: err1 } = await supabase.from('inspections').delete().eq('id', id)
+                 const { error: err1 } = await api.from('inspections').delete().eq('id', id)
                  if (err1) {
                    console.error('Remote delete error (inspections):', err1)
                    
                    // Fallback: Try deleting from 'respostas_checklist' table (legacy/original)
-                   const { error: err2 } = await supabase.from('respostas_checklist').delete().eq('id', id)
+                   const { error: err2 } = await api.from('respostas_checklist').delete().eq('id', id)
                    if (err2) {
                      // Enqueue for retry if it was a network error or similar
                      // But strictly, if we are online and it failed, maybe we should queue it?
@@ -913,7 +912,7 @@ export const useAppStore = create<AppState>()(
 
       saveCalibragem: async (record: any) => {
         try {
-          const { error } = await supabase.from('calibragem').upsert([record], { onConflict: 'local_id' })
+          const { error } = await api.from('calibragem').upsert([record], { onConflict: 'local_id' })
           if (error) throw error
           notify({ message: 'Calibragem lançada', type: 'success' })
           notifyNative('Calibragem lançada', 'Dados enviados')
@@ -927,7 +926,7 @@ export const useAppStore = create<AppState>()(
 
       saveControle3p: async (record: any) => {
         try {
-          const { error } = await supabase.from('controle_3p').upsert([record], { onConflict: 'local_id' })
+          const { error } = await api.from('controle_3p').upsert([record], { onConflict: 'local_id' })
           if (error) throw error
           notify({ message: 'Controle 3P lançado', type: 'success' })
           notifyNative('Controle 3P lançado', 'Dados enviados')
@@ -941,8 +940,8 @@ export const useAppStore = create<AppState>()(
 
       loadHistoricoPneus: async (filters) => {
         try {
-          let queryCal: any = supabase.from('calibragem').select('*').order('created_at', { ascending: false }).limit(100)
-          let queryC3p: any = supabase.from('controle_3p').select('*').order('created_at', { ascending: false }).limit(100)
+          let queryCal: any = api.from('calibragem').select('*').order('created_at', { ascending: false }).limit(100)
+          let queryC3p: any = api.from('controle_3p').select('*').order('created_at', { ascending: false }).limit(100)
           if (filters?.frota) {
             queryCal = queryCal.contains('header', { frota: filters.frota })
             queryC3p = queryC3p.contains('header', { frota: filters.frota })
@@ -1043,10 +1042,10 @@ export const useAppStore = create<AppState>()(
                         try {
                           const blob = toBlob(val)
                           const path = `photos/${resposta.id}/${it.id}-${timestamp}.jpg`
-                          const { error: upError } = await supabase.storage.from('app').upload(path, blob, { upsert: true })
+                          const { error: upError } = await api.storage.from('app').upload(path, blob, { upsert: true })
                           
                           if (!upError) {
-                            const publicUrl = supabase.storage.from('app').getPublicUrl(path).data.publicUrl
+                            const publicUrl = api.storage.from('app').getPublicUrl(path).data.publicUrl
                             
                             // Save foto entry
                             await offlineStorage.saveFoto({ 
@@ -1139,7 +1138,7 @@ export const useAppStore = create<AppState>()(
                   }
                   return { error: lastErr || new Error('Upsert failed') }
                 }
-                const upsertCall = () => supabase.from('inspections').upsert(payload, { onConflict: 'local_id' }).select()
+                const upsertCall = () => api.from('inspections').upsert(payload, { onConflict: 'local_id' }).select()
                 const { error, data: upsertData } = await retry(upsertCall)
 
                 if (!error) {
@@ -1185,24 +1184,24 @@ export const useAppStore = create<AppState>()(
                 // Handle Delete Operations
                 if (item.type === 'delete') {
                    if (item.table === 'inspections' || item.table === 'respostas_checklist') {
-                      const { error: err1 } = await supabase.from('inspections').delete().eq('id', item.data.id)
+                      const { error: err1 } = await api.from('inspections').delete().eq('id', item.data.id)
                       // Also try legacy table just in case
-                      const { error: err2 } = await supabase.from('respostas_checklist').delete().eq('id', item.data.id)
+                      const { error: err2 } = await api.from('respostas_checklist').delete().eq('id', item.data.id)
                       
                       if (err1 && err2) throw new Error(err1.message || err2.message)
                    } else if (item.table === 'calibragem') {
-                      await supabase.from('calibragem').delete().eq('id', item.data.id)
+                      await api.from('calibragem').delete().eq('id', item.data.id)
                    } else if (item.table === 'controle_3p') {
-                      await supabase.from('controle_3p').delete().eq('id', item.data.id)
+                      await api.from('controle_3p').delete().eq('id', item.data.id)
                    }
                    continue // Success
                 }
 
                 if (item.table === 'calibragem') {
-                  const { error } = await supabase.from('calibragem').upsert([item.data], { onConflict: 'local_id' })
+                  const { error } = await api.from('calibragem').upsert([item.data], { onConflict: 'local_id' })
                   if (error) throw error
                 } else if (item.table === 'controle_3p') {
-                  const { error } = await supabase.from('controle_3p').upsert([item.data], { onConflict: 'local_id' })
+                  const { error } = await api.from('controle_3p').upsert([item.data], { onConflict: 'local_id' })
                   if (error) throw error
                 } else {
                   remaining.push(item)
@@ -1334,7 +1333,7 @@ export const useAppStore = create<AppState>()(
             local_id: resposta.id,
             created_at: new Date().toISOString(),
           }
-          const { error } = await supabase
+          const { error } = await api
             .from('inspections')
             .upsert(payload, { onConflict: 'local_id' })
           if (!error) {

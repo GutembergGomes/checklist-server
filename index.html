@@ -3199,7 +3199,8 @@
         const INSPECTION_PHOTOS_BUCKET = 'inspection-photos';
         
         // Inicializar cliente API (substitui Supabase)
-        var supabase = window.createApiClient();
+        var api = window.createApiClient();
+        var supabase = api;
         
         // Estado global da aplicação
         let currentUser = null;
@@ -4707,9 +4708,11 @@
                     console.error('Erro ao verificar sessão:', error);
                     if (!isOnline()) {
                         const cached = getCachedUser();
-                        currentUser = cached || getOfflineUser();
-                        showApp();
-                        return;
+                        if (cached) {
+                            currentUser = cached;
+                            showApp();
+                            return;
+                        }
                     }
                     showLogin();
                     return;
@@ -4717,12 +4720,17 @@
                 
                 if (session) {
                     currentUser = session.user;
+                    setCachedUser(session.user);
                     showApp();
                 } else {
                     if (!isOnline()) {
                         const cached = getCachedUser();
-                        currentUser = cached || getOfflineUser();
-                        showApp();
+                        if (cached) {
+                            currentUser = cached;
+                            showApp();
+                        } else {
+                            showLogin();
+                        }
                     } else {
                         showLogin();
                     }
@@ -4731,8 +4739,12 @@
                 console.error('Erro ao verificar autenticação:', error);
                 const cached = getCachedUser();
                 if (!isOnline()) {
-                    currentUser = cached || getOfflineUser();
-                    showApp();
+                    if (cached) {
+                        currentUser = cached;
+                        showApp();
+                    } else {
+                        showLogin();
+                    }
                 } else {
                     if (cached) { currentUser = cached; showApp(); } else { showLogin(); }
                 }
@@ -4883,7 +4895,7 @@
             showLoading(true);
             
             try {
-                if (!window.supabase || !supabase) {
+                if (!window.createApiClient || !api) {
                     throw new Error('Cliente Supabase não inicializado. Verifique a URL e a chave.');
                 }
                 let result;
@@ -5476,8 +5488,8 @@
                 let c3pList = [];
                 const online = isOnline();
                 if (online) {
-                    const calResp = await supabase.from('calibragem').select('*').order('created_at', { ascending: false }).limit(100);
-                    const c3pResp = await supabase.from('controle_3p').select('*').order('created_at', { ascending: false }).limit(100);
+                    const calResp = await api.from('calibragem').select('*').order('created_at', { ascending: false }).limit(100);
+                    const c3pResp = await api.from('controle_3p').select('*').order('created_at', { ascending: false }).limit(100);
                     calList = (calResp.data || []);
                     c3pList = (c3pResp.data || []);
                 }
