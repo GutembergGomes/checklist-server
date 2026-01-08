@@ -187,13 +187,60 @@ async function dbDelete(collection, id) {
 // Health
 app.get('/', (req, res) => res.json({ status: 'online', mode: db ? 'mongodb' : 'json' }))
 
-// Auth (Mock for now, can be upgraded to real JWT)
-const sessions = new Map()
+// Auth (Persistent via MongoDB)
+// const sessions = new Map() // REMOVED: In-memory sessions cause disconnects on restart
+
+app.post('/auth/signup', async (req, res) => {
+  const { email, password, options } = req.body
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
+
+  try {
+    const users = await dbFind('users', { email })
+    if (users.length > 0) {
+      return res.status(400).json({ error: 'User already exists' })
+    }
+
+    // Extrair metadados se fornecidos
+    const metadata = (options && options.data) ? options.data : {}
+    const defaultName = email.split('@')[0]
+    
+    // Garantir que user_metadata tenha algo útil
+    const user_metadata = {
+        name: defaultName,
+        ...metadata
+    }
+
+    const user = {
+      id: crypto.randomUUID(),
+      email,
+      password, // In production, hash this!
+      user_metadata: user_metadata,
+      created_at: new Date().toISOString()
+    }
+    
+    await dbInsert('users', user)
+    
+    const token = crypto.randomUUID()
+    // Persist session in DB
+    await dbInsert('sessions', { 
+        id: crypto.randomUUID(),
+        token, 
+        user_id: user.id, 
+        user, 
+        created_at: new Date().toISOString() 
+    })
+    
+    res.json({ token, user })
+  } catch (e) {
+    console.error('Signup error:', e)
+    res.status(500).json({ error: 'Signup failed' })
+  }
+})
 
 app.post('/auth/signin', async (req, res) => {
   const { email, password } = req.body
   // Accept any login for now or check against DB
-  if (!email) return res.status(400).json({ error: 'Email required' })
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
   
   // Try to find existing user to preserve ID
   try {
@@ -201,18 +248,33 @@ app.post('/auth/signin', async (req, res) => {
     let user = users[0]
 
     if (!user) {
-        // Create new user if not exists
-        user = { 
-            id: crypto.randomUUID(), 
-            email, 
-            user_metadata: { name: email.split('@')[0] },
-            created_at: new Date().toISOString()
+        // Bloquear acesso de não cadastrados
+        return res.status(400).json({ error: 'Usuário não encontrado. Faça o cadastro.' })
+    }
+
+    // Verificar senha
+    if (user.password) {
+        if (user.password !== password) {
+            return res.status(401).json({ error: 'Senha incorreta' })
         }
-        await dbInsert('users', user)
+    } else {
+        // Migração: Usuário antigo sem senha -> Define a senha agora
+        user.password = password
+        // Atualizar no banco
+        // Precisamos de um dbUpdate ou dbUpsert
+        await dbUpsert('users', [user], 'id')
     }
 
     const token = crypto.randomUUID()
-    sessions.set(token, { user, created_at: Date.now() })
+    // Persist session in DB
+    await dbInsert('sessions', { 
+        id: crypto.randomUUID(),
+        token, 
+        user_id: user.id, 
+        user, 
+        created_at: new Date().toISOString() 
+    })
+    
     res.json({ token, user })
   } catch (e) {
     console.error('Login error:', e)
@@ -220,17 +282,30 @@ app.post('/auth/signin', async (req, res) => {
   }
 })
 
-app.get('/auth/session', (req, res) => {
+app.get('/auth/session', async (req, res) => {
   const auth = req.headers['authorization'] || ''
   const token = auth.replace('Bearer ', '')
-  const sess = sessions.get(token)
-  res.json({ user: sess ? sess.user : null })
+  
+  try {
+      const sessionsList = await dbFind('sessions', { token })
+      const sess = sessionsList[0]
+      res.json({ user: sess ? sess.user : null })
+  } catch (e) {
+      res.json({ user: null })
+  }
 })
 
-app.post('/auth/signout', (req, res) => {
+app.post('/auth/signout', async (req, res) => {
   const auth = req.headers['authorization'] || ''
   const token = auth.replace('Bearer ', '')
-  sessions.delete(token)
+  
+  try {
+      const sessionsList = await dbFind('sessions', { token })
+      if (sessionsList.length > 0) {
+          await dbDelete('sessions', sessionsList[0].id)
+      }
+  } catch(e) {}
+  
   res.json({ ok: true })
 })
 

@@ -261,6 +261,21 @@ export function createApiClient() {
         return { data: null, error: e }
       }
     },
+    async signUp({ email, password, options }: { email: string; password: string; options?: any }) {
+      try {
+        const res = await request('/auth/signup', {
+          method: 'POST',
+          body: JSON.stringify({ email, password, options }),
+        })
+        const { token, user } = res || {}
+        if (token) {
+          try { localStorage.setItem('checklist-mobile-auth-token', token) } catch {}
+        }
+        return { data: { user }, error: null }
+      } catch (e: any) {
+        return { data: null, error: e }
+      }
+    },
     async signOut() {
       try {
         await request('/auth/signout', { method: 'POST' })

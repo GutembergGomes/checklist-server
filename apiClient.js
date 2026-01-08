@@ -1,5 +1,5 @@
 const API_BASE_URL = 'https://checklist-server-nej7.onrender.com';
-console.log('Custom API Client v2.1 loaded (with .in support)');
+console.log('Custom API Client v2.3 loaded (Render Production)');
 
 window.createApiClient = function() {
     return {
@@ -24,9 +24,27 @@ window.createApiClient = function() {
                     return { data: null, error: { message: e.message } };
                 }
             },
-            signUp: async ({ email, password }) => {
-                 // Redireciona para signin, pois o servidor cria usuário se não existir
-                 return this.signInWithPassword({ email, password });
+            signUp: async ({ email, password, options }) => {
+                try {
+                    const res = await fetch(`${API_BASE_URL}/auth/signup`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password, options })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) return { data: null, error: { message: data.error || 'Erro no cadastro' } };
+                    
+                    if (data.token) {
+                        localStorage.setItem('checklist-auth-token', data.token);
+                        if (data.user) {
+                            localStorage.setItem('checklist-user-data', JSON.stringify(data.user));
+                        }
+                    }
+                    // Retornar estrutura similar ao Supabase
+                    return { data: { user: data.user, session: { access_token: data.token, user: data.user } }, error: null };
+                } catch (e) {
+                    return { data: null, error: { message: e.message } };
+                }
             },
             signOut: async () => {
                 localStorage.removeItem('checklist-auth-token');

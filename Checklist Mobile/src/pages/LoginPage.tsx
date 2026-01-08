@@ -10,9 +10,10 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
-  const { login } = useAppStore()
+  const { login, signUp } = useAppStore()
 
   const [isResetMode, setIsResetMode] = useState(false)
+  const [isSignUpMode, setIsSignUpMode] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetMessage, setResetMessage] = useState({ type: '', text: '' })
 
@@ -118,9 +119,17 @@ export default function LoginPage() {
       return
     }
 
-    const success = await login(email, password)
-    if (!success) {
-      setError('Email ou senha inválidos')
+    let success = false
+    if (isSignUpMode) {
+      success = await signUp(email, password)
+      if (!success) {
+         // Erro tratado no store, mas podemos reforçar aqui
+      }
+    } else {
+      success = await login(email, password)
+      if (!success) {
+        setError('Email ou senha inválidos')
+      }
     }
     
     setIsLoading(false)
@@ -138,11 +147,11 @@ export default function LoginPage() {
           <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-white text-2xl font-bold">CM</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Checklist Mobile
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            {isSignUpMode ? 'Criar Conta' : 'Checklist Mobile'}
           </h1>
-          <p className="text-gray-600">
-            Sistema de Checklist de Manutenção
+          <p className="text-gray-300">
+            {isSignUpMode ? 'Preencha os dados para se cadastrar' : 'Sistema de Checklist de Manutenção'}
           </p>
         </div>
 
@@ -150,7 +159,7 @@ export default function LoginPage() {
         <div className="bg-white/90 dark:bg-black/70 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Email
               </label>
               <input
@@ -166,7 +175,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Senha
               </label>
               <div className="relative">
@@ -196,7 +205,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="flex items-center text-red-600 text-sm">
+              <div className="flex items-center text-red-600 text-sm bg-red-50 p-2 rounded">
                 <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
                 {error}
               </div>
@@ -205,19 +214,32 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 transition-colors"
             >
-              {isLoading ? 'Entrando...' : 'Entrar'}
+              {isLoading ? (isSignUpMode ? 'Cadastrando...' : 'Entrando...') : (isSignUpMode ? 'Cadastrar' : 'Entrar')}
             </button>
           </form>
 
-          <div className="mt-4 text-center">
+          <div className="mt-6 flex flex-col space-y-2 text-center text-sm">
+            {!isSignUpMode && (
+              <button
+                type="button"
+                onClick={() => setIsResetMode(true)}
+                className="text-blue-600 hover:text-blue-500 font-medium"
+              >
+                Esqueceu a senha?
+              </button>
+            )}
+            
             <button
               type="button"
-              onClick={() => setIsResetMode(true)}
-              className="text-sm text-blue-600 hover:text-blue-500"
+              onClick={() => {
+                setIsSignUpMode(!isSignUpMode)
+                setError('')
+              }}
+              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             >
-              Esqueceu sua senha?
+              {isSignUpMode ? 'Já tem uma conta? Faça login' : 'Não tem conta? Cadastre-se'}
             </button>
           </div>
         </div>

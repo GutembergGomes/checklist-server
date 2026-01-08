@@ -56,6 +56,7 @@ const notifyNative = async (title: string, body?: string) => {
   
   // Actions
   login: (email: string, password: string) => Promise<boolean>
+  signUp: (email: string, password: string) => Promise<boolean>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
   loadAccessControls: () => Promise<void>
@@ -177,6 +178,50 @@ export const useAppStore = create<AppState>()(
           console.error('Login error:', error)
           set({ isLoading: false })
           notify({ message: 'Falha na autenticação. Verifique suas credenciais.', type: 'error' })
+          return false
+        }
+      },
+
+      signUp: async (email: string, password: string) => {
+        try {
+          set({ isLoading: true })
+          
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+          })
+
+          if (error) throw error
+
+          if (data.user) {
+            const mapped: Usuario = {
+              id: data.user.id,
+              email: data.user.email || '',
+              nome: (data.user.user_metadata && (data.user.user_metadata.name || data.user.user_metadata.full_name)) || (data.user.email || 'Usuário'),
+              role: 'tecnico',
+              ativo: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+            
+            set({ 
+              user: mapped,
+              isAuthenticated: true,
+              isLoading: false 
+            })
+            
+            await get().loadEquipamentos()
+            await get().loadChecklists()
+            await get().loadInspections()
+            await get().loadAccessControls()
+            
+            return true
+          }
+          return false
+        } catch (error: any) {
+          console.error('Signup error:', error)
+          set({ isLoading: false })
+          notify({ message: error.message || 'Falha no cadastro.', type: 'error' })
           return false
         }
       },
@@ -731,7 +776,7 @@ export const useAppStore = create<AppState>()(
                 }
                 return { error: lastErr || new Error('Upsert failed') }
               }
-              const upsertCall = () => supabase.from('inspections').upsert(payload, { onConflict: 'id' }).select()
+              const upsertCall = () => supabase.from('inspections').upsert(payload, { onConflict: 'id' })
               const { error, data: upsertData } = await retry(upsertCall)
               if (!error) {
                 await offlineStorage.saveResposta({ ...response, sincronizado: true }, true)
@@ -814,7 +859,7 @@ export const useAppStore = create<AppState>()(
            await offlineStorage.deleteInspectionCache(id)
            await offlineStorage.deleteResposta(id)
            
-           // 2. Delete from Supabase if online and authorized
+           // 2. Delete from Server if online and authorized
            if (get().isOnline && !isOfflineUser) {
               const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
               
@@ -914,7 +959,10 @@ export const useAppStore = create<AppState>()(
       syncData: async () => {
         const currentUser = get().user
         if (get().syncInProgress || !get().isOnline) return
-        if (!currentUser || currentUser.id.startsWith('offline')) return
+        
+        // Allow sync if we have a token, even if currentUser is "offline" (e.g. app started offline)
+        const token = localStorage.getItem('checklist-mobile-auth-token')
+        if (!token && (!currentUser || currentUser.id.startsWith('offline'))) return
 
         set({ syncInProgress: true })
         
