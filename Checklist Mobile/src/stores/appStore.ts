@@ -548,7 +548,10 @@ export const useAppStore = create<AppState>()(
              addLog(`[DEBUG] Usando fallback cache (FATAL): ${cached.length}`)
              set({ inspections: cached })
           } else {
-             set({ inspections: [] })
+             // Only clear if we really have nothing to show to avoid flashing empty screen on transient errors
+             if (get().inspections.length === 0) {
+                set({ inspections: [] })
+             }
           }
         }
       },
