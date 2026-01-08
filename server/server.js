@@ -129,7 +129,11 @@ async function dbUpsert(collection, items, onConflict = 'id') {
         continue
       }
       
+      // Ensure created_at is NEVER in $set
       const { created_at, _id, ...updateFields } = item
+      // Double check cleanup
+      if ('created_at' in updateFields) delete updateFields.created_at
+      
       const update = { 
         $set: { ...updateFields, updated_at: new Date().toISOString() }, 
         $setOnInsert: { created_at: created_at || new Date().toISOString() } 
