@@ -80,6 +80,11 @@ const notifyNative = async (title: string, body?: string) => {
   
   // Initialize offline storage
   initializeOfflineStorage: () => Promise<void>
+  
+  // Debug
+  debugLogs: string[]
+  addDebugLog: (msg: string) => void
+  clearDebugLogs: () => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -97,6 +102,15 @@ export const useAppStore = create<AppState>()(
       isOnline: navigator.onLine,
       lastSync: null,
       syncInProgress: false,
+      debugLogs: [],
+      
+      addDebugLog: (msg: string) => {
+        set(state => {
+            const logs = state.debugLogs || []
+            return { debugLogs: [...logs.slice(-49), `[${new Date().toLocaleTimeString()}] ${msg}`] }
+        })
+      },
+      clearDebugLogs: () => set({ debugLogs: [] }),
 
       // Auth actions
       resetPasswordForEmail: async (email: string) => {
@@ -297,127 +311,228 @@ export const useAppStore = create<AppState>()(
       },
 
       loadInspections: async () => {
+        const addLog = get().addDebugLog
+        addLog('[DEBUG] Iniciando loadInspections v3.7')
+        
+        const safeErr = (e: any) => {
+            if (e instanceof Error) return e.message + (e.stack ? ' ' + e.stack.split('\n')[1] : '')
+            if (typeof e === 'object') {
+                try { return JSON.stringify(e) } catch { return String(e) }
+            }
+            return String(e)
+        }
+
+        let cached: any[] = []
+        let fresh: any[] = []
+        let pendingInspections: any[] = []
+
         try {
           // 1. Load cache first for immediate display
           try {
-            const cached = await offlineStorage.getInspectionsCache()
+            cached = await offlineStorage.getInspectionsCache() || []
             if (Array.isArray(cached) && cached.length) {
+              addLog(`[DEBUG] Cache local carregado: ${cached.length} itens`)
               set({ inspections: cached })
+            } else {
+              addLog('[DEBUG] Cache local vazio ou inválido')
             }
-          } catch {}
-
-          // 2. Fetch fresh data from server (both tables)
-          const [q1, q2] = await Promise.all([
-             api.from('inspections').select('*').order('created_at', { ascending: false }),
-             api.from('respostas_checklist').select('*').order('created_at', { ascending: false })
-          ])
-
-          const data1 = Array.isArray(q1.data) ? q1.data : []
-          const data2 = Array.isArray(q2.data) ? q2.data : []
-          
-          // Merge remote data: prefer inspections (data1) over respostas_checklist (data2)
-          const data1Ids = new Set(data1.map((i:any) => i.id))
-          const data1LocalIds = new Set(data1.map((i:any) => i.local_id).filter(Boolean))
-          
-          const uniqueData2 = data2.filter((i:any) => !data1Ids.has(i.id) && !data1LocalIds.has(i.id))
-          let fresh = [...data1, ...uniqueData2]
-
-          // Enrich data
-          const equipamentos = get().equipamentos || []
-          const checklists = get().checklists || []
-          const eqMap = new Map(equipamentos.map(e => [e.id, e]))
-          const eqCodeMap = new Map(equipamentos.map(e => [e.codigo, e]))
-          const clMap = new Map(checklists.map(c => [c.id, c]))
-
-          fresh = fresh.map((item: any) => {
-             // Basic enrichment logic
-             let frotaNome = item.frota || item.equipamento_id
-             const eq = eqMap.get(item.equipamento_id) || eqCodeMap.get(item.frota)
-             if (eq) frotaNome = eq.codigo
-             
-             let tipo = item.tipo
-             if (!tipo && item.checklist_id) {
-                 const cl = clMap.get(item.checklist_id)
-                 if (cl) tipo = cl.tipo
-             }
-             if (!tipo) tipo = 'Checklist'
-
-             let percentage = 0
-             let results = item.results || { ok: 0, notOk: 0, percentage: 0 }
-             
-             // Calculate results if missing (for legacy items)
-             if (item.results?.percentage === undefined && Array.isArray(item.respostas)) {
-                const normalize = (s: any) => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
-                const statuses = item.respostas.map((r: any) => {
-                   const val = r.valor
-                   const n = normalize(val)
-                   if (n === 'ok' || n === 'aprovado' || n === 'true' || n === 'sim' || n === 'conforme' || n === 'bom') return 'ok'
-                   if (n.includes('nao') || n === 'reprovado' || n === 'false' || n === 'ruim') return 'notok'
-                   if (n.includes('nao aplica') || n === 'na' || n === 'n/a') return 'na'
-                   return null
-                }).filter((s:any) => s !== null)
-                
-                const ok = statuses.filter((s:any) => s === 'ok').length
-                const notOk = statuses.filter((s:any) => s === 'notok').length
-                const total = statuses.filter((s:any) => s !== 'na').length
-                percentage = total ? Math.round((ok / total) * 100) : 0
-                results = { ok, notOk, percentage }
-             }
-
-             return {
-               ...item,
-               frota: frotaNome,
-               tipo,
-               results,
-               created_at: item.created_at || item.data_execucao
-             }
-          })
-
-          // 3. Merge with local pending items (source of truth for unsynced)
-          const pending = await offlineStorage.getRespostasPendentes()
-          
-          // Map pending to inspection format
-          const pendingInspections = []
-          for (const r of pending) {
-             // ... logic to map response to inspection ...
-             // Simplified mapping for merge
-             const checklist = await offlineStorage.getChecklistById(r.checklist_id)
-             pendingInspections.push({
-               id: r.id,
-               local_id: r.id,
-               frota: r.equipamento_id, // simplified
-               tipo: checklist?.tipo || 'Checklist',
-               created_at: r.created_at || r.data_execucao || new Date().toISOString(),
-               results: { percentage: 0 }, // will be calculated in UI or needs logic here
-               pending: true
-             })
+          } catch (e: any) {
+             addLog(`[DEBUG] Erro ao ler cache: ${safeErr(e)}`)
           }
 
-          // Merge: Fresh (Server) + Pending (Local)
-          // Filter out pending items that might have been synced but not removed from local (safety)
-          const freshIds = new Set(fresh.map((i:any) => i.id))
-          const freshLocalIds = new Set(fresh.map((i:any) => i.local_id).filter(Boolean))
+          // 2. Fetch fresh data from server (both tables)
+          addLog('[DEBUG] Buscando dados do servidor...')
+          let data1: any[] = []
+          let data2: any[] = []
+          let serverSuccess = false
           
-          const uniquePending = pendingInspections.filter(p => !freshIds.has(p.id) && !freshLocalIds.has(p.local_id))
-          
-          // SAFETY: REMOVED recentMissing logic to allow deletions to propagate immediately.
-          // If it's not in fresh (server) and not pending (local), it should be considered deleted.
-
-          const merged = [...uniquePending, ...fresh].sort((a:any,b:any)=> 
-            new Date(b.created_at || b.data || 0).getTime() - new Date(a.created_at || a.data || 0).getTime()
-          )
-
-          set({ inspections: merged })
-          await offlineStorage.replaceInspectionsCache(merged)
-
-        } catch (error) {
-          console.error('Load inspections error:', error)
-          // Fallback to cache if server fail
           try {
-            const cached = await offlineStorage.getInspectionsCache()
-            set({ inspections: Array.isArray(cached) ? cached : [] })
-          } catch {
-            set({ inspections: [] })
+              // API returns { data: [], error: null }
+              // Use Promise.allSettled to avoid one failure breaking everything
+              const results = await Promise.allSettled([
+                 api.from('inspections').select('*').order('created_at', { ascending: false }),
+                 api.from('respostas_checklist').select('*').order('created_at', { ascending: false })
+              ])
+              
+              const res1 = results[0].status === 'fulfilled' ? results[0].value : { data: [], error: results[0].reason }
+              const res2 = results[1].status === 'fulfilled' ? results[1].value : { data: [], error: results[1].reason }
+
+              if (res1.error) addLog(`[DEBUG] Erro API Inspections: ${safeErr(res1.error)}`)
+              if (res2.error) addLog(`[DEBUG] Erro API Respostas: ${safeErr(res2.error)}`)
+              
+              data1 = (res1 && res1.data && Array.isArray(res1.data)) ? res1.data : []
+              data2 = (res2 && res2.data && Array.isArray(res2.data)) ? res2.data : []
+              
+              addLog(`[DEBUG] Retorno servidor: ${data1.length} inspections, ${data2.length} respostas`)
+              
+              // Only mark as success if NO errors occurred
+              if (!res1.error && !res2.error && results[0].status === 'fulfilled' && results[1].status === 'fulfilled') {
+                  serverSuccess = true
+              } else {
+                  serverSuccess = false
+                  addLog('[DEBUG] Erro na comunicação com servidor detectado.')
+              }
+              
+          } catch (e: any) {
+              addLog(`[DEBUG] Erro crítico API: ${safeErr(e)}`)
+              serverSuccess = false
+          }
+
+          // 3. Merge remote data or fallback to cache
+          if (serverSuccess) {
+              try {
+                  const data1Ids = new Set(data1.map((i:any) => i.id))
+                  const data1LocalIds = new Set(data1.map((i:any) => i.local_id).filter(Boolean))
+                  
+                  const uniqueData2 = data2.filter((i:any) => !data1Ids.has(i.id) && !data1LocalIds.has(i.id))
+                  fresh = [...data1, ...uniqueData2]
+                  
+                  // Update cache with fresh data
+                  offlineStorage.replaceInspectionsCache(fresh).catch(err => addLog(`[DEBUG] Erro salvar cache: ${safeErr(err)}`))
+                  
+              } catch (e: any) {
+                  addLog(`[DEBUG] Erro merge remote: ${safeErr(e)}`)
+                  fresh = cached // Fallback if merge fails
+              }
+          } else {
+              addLog('[DEBUG] Falha no servidor. Mantendo cache local.')
+              fresh = cached
+          }
+
+          // 4. Enrich data
+          try {
+              const equipamentos = get().equipamentos || []
+              const checklists = get().checklists || []
+              // Ensure arrays
+              const safeEquipamentos = Array.isArray(equipamentos) ? equipamentos : []
+              const safeChecklists = Array.isArray(checklists) ? checklists : []
+              
+              const eqMap = new Map(safeEquipamentos.map(e => [e.id, e]))
+              const eqCodeMap = new Map(safeEquipamentos.map(e => [e.codigo, e]))
+              const clMap = new Map(safeChecklists.map(c => [c.id, c]))
+
+              fresh = fresh.map((item: any) => {
+                 try {
+                     // Basic enrichment logic
+                     let frotaNome = item.frota || item.equipamento_id
+                     const eq = eqMap.get(item.equipamento_id) || eqCodeMap.get(item.frota)
+                     if (eq) frotaNome = eq.codigo
+                     
+                     let tipo = item.tipo
+                     if (!tipo && item.checklist_id) {
+                         const cl = clMap.get(item.checklist_id)
+                         if (cl) tipo = cl.tipo
+                     }
+                     if (!tipo) tipo = 'Checklist'
+
+                     let percentage = 0
+                     let results = item.results || { ok: 0, notOk: 0, percentage: 0 }
+                     
+                     // Calculate results if missing (for legacy items)
+                     if (item.results?.percentage === undefined && Array.isArray(item.respostas)) {
+                        const normalize = (s: any) => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
+                        const statuses = item.respostas.map((r: any) => {
+                           const val = r.valor
+                           const n = normalize(val)
+                           if (n === 'ok' || n === 'aprovado' || n === 'true' || n === 'sim' || n === 'conforme' || n === 'bom') return 'ok'
+                           if (n.includes('nao') || n === 'reprovado' || n === 'false' || n === 'ruim') return 'notok'
+                           if (n.includes('nao aplica') || n === 'na' || n === 'n/a') return 'na'
+                           return null
+                        }).filter((s:any) => s !== null)
+                        
+                        const ok = statuses.filter((s:any) => s === 'ok').length
+                        const notOk = statuses.filter((s:any) => s === 'notok').length
+                        const total = statuses.filter((s:any) => s !== 'na').length
+                        percentage = total ? Math.round((ok / total) * 100) : 0
+                        results = { ok, notOk, percentage }
+                     }
+
+                     return {
+                       ...item,
+                       frota: frotaNome,
+                       tipo,
+                       results,
+                       created_at: item.created_at || item.data_execucao
+                     }
+                 } catch (e) {
+                     return item // Return raw item if enrichment fails
+                 }
+              })
+              addLog(`[DEBUG] Itens enriquecidos: ${fresh.length}`)
+          } catch (e: any) {
+               addLog(`[DEBUG] Erro enrichment: ${safeErr(e)}`)
+          }
+
+          // 5. Merge with local pending items (source of truth for unsynced)
+          let pending: any[] = []
+          try {
+             pending = await offlineStorage.getRespostasPendentes() || []
+             addLog(`[DEBUG] Pendentes locais brutos: ${pending.length}`)
+          } catch (e) {
+             addLog(`[DEBUG] Erro ao ler pendentes: ${safeErr(e)}`)
+          }
+          
+          // Map pending to inspection format
+          for (const r of pending) {
+             try {
+                 const checklist = await offlineStorage.getChecklistById(r.checklist_id)
+                 pendingInspections.push({
+                   id: r.id,
+                   local_id: r.id,
+                   frota: r.equipamento_id, // simplified
+                   tipo: checklist?.tipo || 'Checklist',
+                   created_at: r.created_at || r.data_execucao || new Date().toISOString(),
+                   results: { percentage: 0 }, // will be calculated in UI or needs logic here
+                   pending: true
+                 })
+             } catch (e) {
+                addLog(`[DEBUG] Erro ao processar pendente ${r.id}: ${safeErr(e)}`)
+             }
+          }
+
+          addLog(`[DEBUG] Pendentes processados: ${pendingInspections.length}`)
+
+          // 6. Merge Final: Fresh (Server) + Pending (Local)
+          let merged: any[] = []
+          try {
+              const freshIds = new Set(fresh.map((i:any) => i.id))
+              const freshLocalIds = new Set(fresh.map((i:any) => i.local_id).filter(Boolean))
+              
+              const uniquePending = pendingInspections.filter(p => !freshIds.has(p.id) && !freshLocalIds.has(p.local_id))
+              
+              merged = [...uniquePending, ...fresh].sort((a:any,b:any)=> {
+                 const tA = new Date(a.created_at || a.data || 0).getTime()
+                 const tB = new Date(b.created_at || b.data || 0).getTime()
+                 return (isNaN(tB) ? 0 : tB) - (isNaN(tA) ? 0 : tA)
+              })
+
+              addLog(`[DEBUG] Total final: ${merged.length}`)
+              set({ inspections: merged })
+          } catch (e: any) {
+              addLog(`[DEBUG] Erro merge final: ${safeErr(e)}`)
+              // If merge fails, try to show at least something
+              if (fresh.length > 0) set({ inspections: fresh })
+              else if (cached.length > 0) set({ inspections: cached })
+          }
+          
+          try {
+            if (merged.length > 0) {
+                await offlineStorage.replaceInspectionsCache(merged)
+            }
+          } catch (e: any) {
+             addLog(`[DEBUG] Erro ao salvar cache final: ${safeErr(e)}`)
+          }
+
+        } catch (error: any) {
+          console.error('Load inspections error:', error)
+          addLog(`[DEBUG] FATAL loadInspections: ${safeErr(error)}`)
+          
+          // Fallback to cache if everything fails
+          if (cached.length > 0) {
+             addLog(`[DEBUG] Usando fallback cache (FATAL): ${cached.length}`)
+             set({ inspections: cached })
+          } else {
+             set({ inspections: [] })
           }
         }
       },
@@ -607,6 +722,12 @@ export const useAppStore = create<AppState>()(
 
       saveChecklistResponse: async (response: RespostaChecklist) => {
         try {
+          const normalizedResponse: RespostaChecklist = {
+            ...response,
+            id: response.id || crypto.randomUUID(),
+            created_at: response.created_at || new Date().toISOString(),
+            sincronizado: typeof response.sincronizado === 'boolean' ? response.sincronizado : false,
+          }
           const toBlob = (dataUrl: string) => {
             const arr = dataUrl.split(',')
             const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
@@ -619,7 +740,7 @@ export const useAppStore = create<AppState>()(
           // Determine tipo for duplicate window check
           let tipoPayload = 'preventiva'
           try {
-            const checklist = await offlineStorage.getChecklistById(response.checklist_id)
+            const checklist = await offlineStorage.getChecklistById(normalizedResponse.checklist_id)
             if (checklist && typeof checklist.tipo === 'string' && checklist.tipo.length) {
               tipoPayload = checklist.tipo
             }
@@ -660,21 +781,21 @@ export const useAppStore = create<AppState>()(
 
           // If there are fotos em dataURL na resposta, faça upload e substitua por URL pública
           try {
-            const checklist = await offlineStorage.getChecklistById(response.checklist_id)
+            const checklist = await offlineStorage.getChecklistById(normalizedResponse.checklist_id)
             const fotoItems = (checklist?.itens || []).filter((it:any)=> it.tipo === 'foto')
             const timestamp = Date.now()
             const uploadPromises = fotoItems.map(async (it: any) => {
-              const val = (response.respostas || []).find((r:any)=> r.item_id === it.id)?.valor
+              const val = (normalizedResponse.respostas || []).find((r:any)=> r.item_id === it.id)?.valor
               if (typeof val === 'string' && val.startsWith('data:')) {
                 const blob = toBlob(val)
-                const path = `photos/${response.id}/${it.id}-${timestamp}.jpg`
+                const path = `photos/${normalizedResponse.id}/${it.id}-${timestamp}.jpg`
                 const up = await api.storage.from('app').upload(path, blob, { upsert: true })
                 if (!up.error) {
                   const publicUrl = `${api.storage.from('app').getPublicUrl(path).data.publicUrl}`
                   // persist foto separadamente
-                  await offlineStorage.saveFoto({ id: `${response.id}-${it.id}-${timestamp}`, resposta_id: response.id, url: publicUrl, created_at: new Date().toISOString() } as any)
+                  await offlineStorage.saveFoto({ id: `${normalizedResponse.id}-${it.id}-${timestamp}`, resposta_id: normalizedResponse.id, url: publicUrl, created_at: new Date().toISOString() } as any)
                   // também atualiza valor no array
-                  const target = (response.respostas || []).find((r:any)=> r.item_id === it.id)
+                  const target = (normalizedResponse.respostas || []).find((r:any)=> r.item_id === it.id)
                   if (target) target.valor = publicUrl
                 }
               }
@@ -687,7 +808,7 @@ export const useAppStore = create<AppState>()(
           // Save to offline storage
           notify({ message: 'Lançamento em andamento...', type: 'info' })
           notifyNative('Lançamento em andamento', 'Processando dados')
-          await offlineStorage.saveResposta(response)
+          await offlineStorage.saveResposta(normalizedResponse)
           
           // Update pending sync count
           const updatePendingCount = async () => {
@@ -717,14 +838,14 @@ export const useAppStore = create<AppState>()(
               // Build items in web schema { id, name, section, status, note }
               let itemsResult: any[] = []
               try {
-                const checklist = await offlineStorage.getChecklistById(response.checklist_id)
+                const checklist = await offlineStorage.getChecklistById(normalizedResponse.checklist_id)
                 const itens = (checklist?.itens || [])
                 itemsResult = itens.map((it: any) => {
                   const raw = String(it.descricao || '')
                   const parts = raw.split(' • ')
                   const section = parts.length > 1 ? parts[0] : 'Geral'
                   const name = parts.length > 1 ? parts.slice(1).join(' • ') : raw
-                  const val = (response.respostas || []).find((r:any)=> r.item_id === it.id)?.valor
+                  const val = (normalizedResponse.respostas || []).find((r:any)=> r.item_id === it.id)?.valor
                   const normalize = (s: any) => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
                   let status: 'ok' | 'notok' | 'na' = 'na'
                   if (it.tipo === 'booleano' || it.tipo === 'opcoes') {
@@ -736,11 +857,11 @@ export const useAppStore = create<AppState>()(
                   const note = typeof val === 'string' ? val : (val === true ? 'OK' : (val === false ? 'Não OK' : String(val ?? '')))
                   return { id: it.id, name, section, status, note }
                 })
-                if (response.observacoes) {
-                  itemsResult.push({ id: 'observacao', name: 'Observação', section: 'Geral', status: 'na', note: response.observacoes })
+                if (normalizedResponse.observacoes) {
+                  itemsResult.push({ id: 'observacao', name: 'Observação', section: 'Geral', status: 'na', note: normalizedResponse.observacoes })
                 }
                 try {
-                  const fotos = await offlineStorage.getFotosByRespostaId(response.id)
+                  const fotos = await offlineStorage.getFotosByRespostaId(normalizedResponse.id)
                   const urls = (fotos || []).map((f:any)=> f.url).filter(Boolean)
                   if (urls.length) {
                     itemsResult.push({ id: 'fotos', name: 'Fotos', section: 'Geral', status: 'na', note: '', photos: urls })
@@ -754,16 +875,16 @@ export const useAppStore = create<AppState>()(
               const nomeRaw = (get().user?.nome || get().user?.email || 'Tecnico')
               const mecanicoNome = nomeRaw.includes('@') ? nomeRaw.split('@')[0] : nomeRaw
               const payload = {
-                data: new Date(response.data_execucao).toISOString().slice(0, 10),
+                data: new Date(normalizedResponse.data_execucao).toISOString().slice(0, 10),
                 tipo: tipoPayload,
-                frota: response.equipamento_id,
+                frota: normalizedResponse.equipamento_id,
                 items: itemsResult,
                 results: { ok: ok_count, notOk: nao_ok_count, percentage: nivel },
-                user_id: currentUser?.id || response.usuario_id,
-                observacao: response.observacoes ?? null,
+                user_id: currentUser?.id || normalizedResponse.usuario_id,
+                observacao: normalizedResponse.observacoes ?? null,
                 mecanico: mecanicoNome,
-                local_id: response.id,
-                id: response.id, // Ensure canonical ID is sent
+                local_id: normalizedResponse.id,
+                id: normalizedResponse.id,
                 // created_at removed to avoid conflict
               }
               const retry = async (fn: ()=>Promise<any>, attempts=3) => {
@@ -778,12 +899,12 @@ export const useAppStore = create<AppState>()(
               const upsertCall = () => api.from('inspections').upsert(payload, { onConflict: 'id' })
               const { error, data: upsertData } = await retry(upsertCall)
               if (!error) {
-                await offlineStorage.saveResposta({ ...response, sincronizado: true }, true)
+                await offlineStorage.saveResposta({ ...normalizedResponse, sincronizado: true }, true)
                 
                 // Cleanup queue item to prevent double count later
                 try {
                   const q = await offlineStorage.getSyncQueue()
-                  const qItem = q.find((x:any) => x.table === 'respostas_checklist' && x.data?.id === response.id)
+                  const qItem = q.find((x:any) => x.table === 'respostas_checklist' && x.data?.id === normalizedResponse.id)
                   if (qItem) {
                     await offlineStorage.markAsSynced(qItem.id)
                   }
@@ -1071,7 +1192,7 @@ export const useAppStore = create<AppState>()(
 
                 // If photos were updated, save the response locally before syncing
                 if (photosUpdated) {
-                  await offlineStorage.saveResposta(resposta)
+                  await offlineStorage.saveResposta(resposta, true)
                 }
 
                 let tipoPayload = 'preventiva'
@@ -1337,7 +1458,7 @@ export const useAppStore = create<AppState>()(
             .from('inspections')
             .upsert(payload, { onConflict: 'local_id' })
           if (!error) {
-            await offlineStorage.saveResposta({ ...resposta, sincronizado: true })
+            await offlineStorage.saveResposta({ ...resposta, sincronizado: true }, true)
             const left = await offlineStorage.getRespostasPendentes()
             set({ pendingSync: left.length })
             try { await offlineStorage.upsertInspectionCache(payload) } catch {}
@@ -1366,6 +1487,18 @@ export const useAppStore = create<AppState>()(
         try {
           await offlineStorage.init()
           console.log('Offline storage initialized')
+
+          try {
+            const pendentes = await offlineStorage.getRespostasPendentes().catch(() => [])
+            const queue = await offlineStorage.getSyncQueue().catch(() => [])
+            const uniqueQueue = (queue || []).filter((q: any) => {
+              if (q.table === 'respostas_checklist' && q.data?.id) {
+                return !(pendentes || []).some((p: any) => p.id === q.data.id)
+              }
+              return true
+            })
+            set({ pendingSync: (pendentes?.length || 0) + (uniqueQueue?.length || 0) })
+          } catch {}
           
           // Request notification permissions
           try {
@@ -1416,6 +1549,14 @@ export const useAppStore = create<AppState>()(
                 state.syncData()
               }
             }, 60000)
+          } catch {}
+
+          try {
+            if (navigator.onLine) {
+              get().setOnlineStatus(true)
+            } else {
+              get().setOnlineStatus(false)
+            }
           } catch {}
         } catch (error) {
           console.error('Failed to initialize offline storage:', error)

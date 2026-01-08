@@ -108,7 +108,7 @@ export default function ChecklistsPage() {
     setProgresses(prog)
   }, [inspections, pendentesLocal])
 
-  const filteredInspections = ([...pendentesLocal, ...(inspections || [])])
+  const filteredInspections = ([...pendentesLocal, ...(inspections || []).filter((i:any) => !i.pending)])
     .filter((i:any) => {
       const matchesSearch = String(i.frota||'').toLowerCase().includes(searchTerm.toLowerCase()) || String(i.tipo||'').toLowerCase().includes(searchTerm.toLowerCase())
       const matchesType = typeFilter === 'all' || String(i.tipo||'').toLowerCase() === typeFilter

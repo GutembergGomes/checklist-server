@@ -10,7 +10,7 @@ const api = createApiClient()
 
 function ConfiguracoesPage() {
   const [usage, setUsage] = useState<{ used: number; quota: number; percentage: number }>({ used: 0, quota: 0, percentage: 0 })
-  const { logout } = useAppStore()
+  const { logout, debugLogs, clearDebugLogs } = useAppStore()
 
   useEffect(() => {
     offlineStorage.getStorageUsage().then(setUsage)
@@ -35,6 +35,23 @@ function ConfiguracoesPage() {
         >
           Sair da conta
         </button>
+      </div>
+
+      <div className="glassmorphism rounded-xl p-4 mt-4 space-y-3">
+        <div className="flex justify-between items-center">
+          <h2 className="text-base font-semibold">Logs de Depuração (v3.8 FixApi)</h2>
+          <button onClick={clearDebugLogs} className="text-xs px-2 py-1 bg-red-500 rounded text-white">Limpar</button>
+        </div>
+          <div className="flex gap-2 mb-2">
+             <button onClick={() => useAppStore.getState().loadInspections()} className="text-xs px-2 py-1 bg-blue-500 rounded text-white w-full">Recarregar Inspeções</button>
+          </div>
+          <div className="bg-black/50 p-2 rounded text-xs font-mono h-40 overflow-y-auto text-green-400">
+           {debugLogs && debugLogs.length > 0 ? (
+             debugLogs.map((log, i) => <div key={i}>{log}</div>)
+           ) : (
+             <div className="text-gray-400 italic">Sem logs registrados</div>
+           )}
+        </div>
       </div>
 
       <div className="glassmorphism rounded-xl p-4 mt-4 space-y-3">

@@ -7,6 +7,20 @@ export default defineConfig({
   build: {
     sourcemap: 'hidden',
   },
+  server: {
+    proxy: {
+      '/db': {
+        target: 'https://checklist-server-nej7.onrender.com',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/auth': {
+        target: 'https://checklist-server-nej7.onrender.com',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
+  },
   plugins: [
     react({
       babel: {

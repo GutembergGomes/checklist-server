@@ -1,7 +1,7 @@
 import { Checklist, RespostaChecklist, Equipamento, Foto } from '../types/database'
 
 const DB_NAME = 'ChecklistMobileDB'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 // Interface kept for documentation
 // interface DatabaseSchema { ... }
@@ -24,53 +24,56 @@ class OfflineStorage {
         const db = (event.target as IDBOpenDBRequest).result
         const upgradeTx = (event.target as IDBOpenDBRequest).transaction as IDBTransaction
 
-        // Checklists store
-        if (!db.objectStoreNames.contains('checklists')) {
-          const checklistStore = db.createObjectStore('checklists', { keyPath: 'id' })
-          checklistStore.createIndex('equipamento_id', 'equipamento_id', { unique: false })
-          checklistStore.createIndex('status', 'status', { unique: false })
-          checklistStore.createIndex('data_prevista', 'data_prevista', { unique: false })
-        }
+        try {
+            // Checklists store
+            if (!db.objectStoreNames.contains('checklists')) {
+              const checklistStore = db.createObjectStore('checklists', { keyPath: 'id' })
+              checklistStore.createIndex('equipamento_id', 'equipamento_id', { unique: false })
+              checklistStore.createIndex('status', 'status', { unique: false })
+              checklistStore.createIndex('data_prevista', 'data_prevista', { unique: false })
+            }
 
-        // Respostas store
-        if (!db.objectStoreNames.contains('respostas')) {
-          const respostasStore = db.createObjectStore('respostas', { keyPath: 'id' })
-          respostasStore.createIndex('checklist_id', 'checklist_id', { unique: false })
-          respostasStore.createIndex('usuario_id', 'usuario_id', { unique: false })
-          respostasStore.createIndex('sincronizado', 'sincronizado', { unique: false })
-        }
+            // Respostas store
+            if (!db.objectStoreNames.contains('respostas')) {
+              const respostasStore = db.createObjectStore('respostas', { keyPath: 'id' })
+              respostasStore.createIndex('checklist_id', 'checklist_id', { unique: false })
+              respostasStore.createIndex('usuario_id', 'usuario_id', { unique: false })
+              respostasStore.createIndex('sincronizado', 'sincronizado', { unique: false })
+            }
 
-        // Equipamentos store
-        if (!db.objectStoreNames.contains('equipamentos')) {
-          const equipamentosStore = db.createObjectStore('equipamentos', { keyPath: 'id' })
-          equipamentosStore.createIndex('codigo', 'codigo', { unique: false })
-          equipamentosStore.createIndex('tipo', 'tipo', { unique: false })
-          equipamentosStore.createIndex('ativo', 'ativo', { unique: false })
-        } else {
-          const store = upgradeTx.objectStore('equipamentos')
-          // Drop unique index if exists and recreate as non-unique
-          try { store.deleteIndex('codigo') } catch {}
-          try { store.createIndex('codigo', 'codigo', { unique: false }) } catch {}
-        }
+            // Equipamentos store
+            if (!db.objectStoreNames.contains('equipamentos')) {
+              const equipamentosStore = db.createObjectStore('equipamentos', { keyPath: 'id' })
+              equipamentosStore.createIndex('codigo', 'codigo', { unique: false })
+              equipamentosStore.createIndex('tipo', 'tipo', { unique: false })
+              equipamentosStore.createIndex('ativo', 'ativo', { unique: false })
+            } else {
+              const store = upgradeTx.objectStore('equipamentos')
+              try { store.deleteIndex('codigo') } catch {}
+              try { store.createIndex('codigo', 'codigo', { unique: false }) } catch {}
+            }
 
-        // Fotos store
-        if (!db.objectStoreNames.contains('fotos')) {
-          const fotosStore = db.createObjectStore('fotos', { keyPath: 'id' })
-          fotosStore.createIndex('resposta_id', 'resposta_id', { unique: false })
-        }
+            // Fotos store
+            if (!db.objectStoreNames.contains('fotos')) {
+              const fotosStore = db.createObjectStore('fotos', { keyPath: 'id' })
+              fotosStore.createIndex('resposta_id', 'resposta_id', { unique: false })
+            }
 
-        // Sync queue store
-        if (!db.objectStoreNames.contains('sync_queue')) {
-          const syncStore = db.createObjectStore('sync_queue', { keyPath: 'id', autoIncrement: true })
-          syncStore.createIndex('table', 'table', { unique: false })
-          syncStore.createIndex('synced', 'synced', { unique: false })
-          syncStore.createIndex('timestamp', 'timestamp', { unique: false })
-        }
+            // Sync queue store
+            if (!db.objectStoreNames.contains('sync_queue')) {
+              const syncStore = db.createObjectStore('sync_queue', { keyPath: 'id', autoIncrement: true })
+              syncStore.createIndex('table', 'table', { unique: false })
+              syncStore.createIndex('synced', 'synced', { unique: false })
+              syncStore.createIndex('timestamp', 'timestamp', { unique: false })
+            }
 
-        // Inspections cache store
-        if (!db.objectStoreNames.contains('inspections_cache')) {
-          const inspStore = db.createObjectStore('inspections_cache', { keyPath: 'cache_id', autoIncrement: true })
-          inspStore.createIndex('created_at', 'created_at', { unique: false })
+            // Inspections cache store
+            if (!db.objectStoreNames.contains('inspections_cache')) {
+              const inspStore = db.createObjectStore('inspections_cache', { keyPath: 'cache_id', autoIncrement: true })
+              inspStore.createIndex('created_at', 'created_at', { unique: false })
+            }
+        } catch (e) {
+            console.error('Error upgrading database:', e)
         }
       }
     })
@@ -463,7 +466,11 @@ class OfflineStorage {
       clearReq.onerror = () => reject(clearReq.error)
       clearReq.onsuccess = () => {
         list.forEach((item) => {
-          try { store.put(item) } catch {}
+          try { 
+              // Clone and remove cache_id if exists to let autoIncrement work or avoid conflicts
+              const { cache_id, ...rest } = item
+              store.put(rest) 
+          } catch {}
         })
       }
       tx.oncomplete = () => resolve()

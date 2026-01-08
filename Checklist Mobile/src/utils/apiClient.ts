@@ -1,3 +1,5 @@
+import { CapacitorHttp } from '@capacitor/core'
+
 type UpsertOptions = {
   onConflict?: string
 }
@@ -19,7 +21,14 @@ function getToken() {
 }
 
 async function request(path: string, init: RequestInit = {}) {
-  if (!API_URL) throw new Error('API local não configurada')
+  const isNative = (window as any).Capacitor?.isNative
+  const isDev = import.meta.env.DEV
+  const isWeb = !isNative
+
+  const fullUrl = isWeb && path.startsWith('/db') && isDev 
+     ? path // Use proxy in dev
+     : `${API_URL}${path}`
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(init.headers as any),
@@ -27,23 +36,53 @@ async function request(path: string, init: RequestInit = {}) {
   const token = getToken()
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 15000) // 15s timeout
-
   try {
-    const res = await fetch(`${API_URL}${path}`, { ...init, headers, signal: controller.signal })
-    clearTimeout(timeoutId)
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      throw new Error(text || `HTTP ${res.status}`)
+    if (isWeb) {
+        // Use standard fetch for Web (works with Vite Proxy in dev)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000)
+        
+        try {
+            const res = await fetch(fullUrl, { ...init, headers, signal: controller.signal })
+            clearTimeout(timeoutId)
+            
+            if (!res.ok) {
+              const text = await res.text().catch(() => '')
+              throw new Error(text || `HTTP ${res.status}`)
+            }
+            
+            const text = await res.text()
+            try {
+                return text ? JSON.parse(text) : null
+            } catch (e) {
+                console.error('Invalid JSON:', text)
+                throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`)
+            }
+        } catch (error: any) {
+            clearTimeout(timeoutId)
+            if (error.name === 'AbortError') throw new Error('Tempo limite da requisição excedido (15s)')
+            throw error
+        }
+    } else {
+        // Use CapacitorHttp for Native (Bypasses CORS)
+        const options = {
+            url: fullUrl,
+            headers,
+            data: init.body ? JSON.parse(init.body as string) : undefined,
+            method: init.method || 'GET',
+            connectTimeout: 15000,
+            readTimeout: 15000
+        }
+        
+        const res = await CapacitorHttp.request(options)
+        
+        if (res.status >= 300) {
+             throw new Error(res.data && typeof res.data === 'string' ? res.data : `HTTP ${res.status}`)
+        }
+        
+        return res.data
     }
-    const json = await res.json().catch(() => null)
-    return json
   } catch (error: any) {
-    clearTimeout(timeoutId)
-    if (error.name === 'AbortError') {
-      throw new Error('Tempo limite da requisição excedido (15s)')
-    }
     throw error
   }
 }
@@ -242,7 +281,8 @@ class QueryBuilder<T> {
       return resolve ? resolve(result) : result
     } catch (e: any) {
       const err = { data: null, error: e }
-      return reject ? reject(err) : err
+      console.error('API Request Error:', e)
+      return resolve ? resolve(err) : err
     }
   }
 
