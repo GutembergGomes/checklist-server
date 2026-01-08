@@ -985,6 +985,12 @@ export const useAppStore = create<AppState>()(
       deleteInspection: async (id: string) => {
         try {
            const currentUser = get().user
+           
+           if (currentUser?.role !== 'admin') {
+              get().notify({ message: 'Permissão negada: Apenas administradores podem excluir.', type: 'error' })
+              return
+           }
+
            const isOfflineUser = currentUser?.id?.startsWith('offline')
            
            // 1. Delete from local storage (cache and pending)

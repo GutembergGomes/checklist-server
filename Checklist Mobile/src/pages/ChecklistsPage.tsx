@@ -201,7 +201,7 @@ export default function ChecklistsPage() {
                   <h3 className="font-semibold mb-1">{item.frota}</h3>
                   <p className="text-sm text white/80 capitalize">{item.tipo}</p>
                 </div>
-                {user?.email === 'gutemberggg10@gmail.com' && (
+                {user?.role === 'admin' && (
                 <button
                   type="button"
                   onClick={(e) => { 
