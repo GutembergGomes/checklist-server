@@ -14,7 +14,11 @@ const DATA_FILE = path.join(__dirname, 'data.json')
 const MONGODB_URI = process.env.MONGODB_URI
 
 // Middleware
-app.use(cors())
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+}))
 app.use(express.json({ limit: '50mb' }))
 
 // Storage Setup
