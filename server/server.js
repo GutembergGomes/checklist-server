@@ -129,7 +129,11 @@ async function dbUpsert(collection, items, onConflict = 'id') {
         continue
       }
       
-      const update = { $set: { ...item, updated_at: new Date().toISOString() }, $setOnInsert: { created_at: item.created_at || new Date().toISOString() } }
+      const { created_at, _id, ...updateFields } = item
+      const update = { 
+        $set: { ...updateFields, updated_at: new Date().toISOString() }, 
+        $setOnInsert: { created_at: created_at || new Date().toISOString() } 
+      }
       if (!item.id) update.$setOnInsert.id = crypto.randomUUID()
       
       const res = await db.collection(collection).findOneAndUpdate(filter, update, { upsert: true, returnDocument: 'after' })
