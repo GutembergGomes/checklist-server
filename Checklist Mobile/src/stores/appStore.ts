@@ -314,7 +314,8 @@ export const useAppStore = create<AppState>()(
 
       loadInspections: async () => {
         const addLog = get().addDebugLog
-        addLog('[DEBUG] Iniciando loadInspections v3.7')
+        console.log('App Version: v3.8-fix-race-condition')
+        addLog('[DEBUG] Iniciando loadInspections v3.8')
         
         const safeErr = (e: any) => {
             if (e instanceof Error) return e.message + (e.stack ? ' ' + e.stack.split('\n')[1] : '')
