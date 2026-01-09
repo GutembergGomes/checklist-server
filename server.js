@@ -201,6 +201,44 @@ app.get('/', (req, res) => res.json({ status: 'online', mode: db ? 'mongodb' : '
 // Auth (Mock for now, can be upgraded to real JWT)
 const sessions = new Map()
 
+// Policy: only new users (created via signup after this change) can access
+// We mark new users with is_new: true at creation time (/auth/signup)
+// Existing users without is_new are considered legacy and blocked from signin
+
+app.post('/auth/signup', async (req, res) => {
+  try {
+    const { email, password, options } = req.body || {}
+    if (!email) return res.status(400).json({ error: 'Email required' })
+    
+    const users = await dbFind('users', { email })
+    if (users && users.length) {
+      return res.status(400).json({ error: 'Conta já existe. Use um novo email.' })
+    }
+    
+    const meta = (options && options.data) || {}
+    const user = {
+      id: crypto.randomUUID(),
+      email,
+      user_metadata: { 
+        name: meta.name || [meta.first_name, meta.last_name].filter(Boolean).join(' ').trim() || (email.split('@')[0]), 
+        first_name: meta.first_name || undefined,
+        last_name: meta.last_name || undefined
+      },
+      is_new: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+    await dbInsert('users', user)
+    
+    const token = crypto.randomUUID()
+    sessions.set(token, { user, created_at: Date.now() })
+    return res.json({ token, user })
+  } catch (e) {
+    console.error('Signup error:', e)
+    return res.status(500).json({ error: 'Signup failed' })
+  }
+})
+
 app.post('/auth/signin', async (req, res) => {
   const { email, password } = req.body
   // Accept any login for now or check against DB
@@ -217,9 +255,15 @@ app.post('/auth/signin', async (req, res) => {
             id: crypto.randomUUID(), 
             email, 
             user_metadata: { name: email.split('@')[0] },
+            is_new: true,
             created_at: new Date().toISOString()
         }
         await dbInsert('users', user)
+    } else {
+        // Block legacy users without is_new flag
+        if (!user.is_new) {
+          return res.status(403).json({ error: 'Acesso restrito: apenas novas contas podem acessar.' })
+        }
     }
 
     const token = crypto.randomUUID()
@@ -235,7 +279,11 @@ app.get('/auth/session', (req, res) => {
   const auth = req.headers['authorization'] || ''
   const token = auth.replace('Bearer ', '')
   const sess = sessions.get(token)
-  res.json({ user: sess ? sess.user : null })
+  const user = sess ? sess.user : null
+  if (user && !user.is_new) {
+    return res.json({ user: null })
+  }
+  res.json({ user })
 })
 
 app.post('/auth/signout', (req, res) => {
