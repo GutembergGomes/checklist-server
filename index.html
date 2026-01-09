@@ -4848,6 +4848,7 @@
             document.getElementById('forgotPasswordModal').classList.add('hidden');
             document.getElementById('loginModal').classList.remove('hidden');
         }
+        try { window.showForgotPassword = showForgotPassword; window.closeForgotPassword = closeForgotPassword; } catch(_) {}
 
         document.getElementById('forgotPasswordForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -4904,6 +4905,7 @@
                 if (lastNameGroup) lastNameGroup.classList.add('hidden');
             }
         }
+        try { window.toggleAuthMode = toggleAuthMode; } catch(_) {}
 
         // Processar formulário de autenticação
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
