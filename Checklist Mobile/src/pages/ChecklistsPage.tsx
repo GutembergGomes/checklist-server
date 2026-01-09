@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Filter, Search, Calendar, Trash } from 'lucide-react'
+import { Filter, Search, Calendar, Trash, Edit, RefreshCw } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { offlineStorage } from '../utils/offlineStorage'
 import { formatPercent } from '../lib/utils'
+
 export default function ChecklistsPage() {
-  const { inspections, loadInspections, user } = useAppStore() as any
+  const { inspections, loadInspections, user, deleteInspection } = useAppStore() as any
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [statuses, setStatuses] = useState<Record<string, 'pendente'|'sincronizado'>>({})
@@ -13,6 +14,13 @@ export default function ChecklistsPage() {
   const [page, setPage] = useState(1)
   const pageSize = 30
   const [pendentesLocal, setPendentesLocal] = useState<any[]>([])
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await loadInspections()
+    setIsRefreshing(false)
+  }
 
   useEffect(() => {
     loadInspections()
@@ -120,7 +128,15 @@ export default function ChecklistsPage() {
 
   const { deleteInspection } = useAppStore()
   const handleDelete = async (id: string) => {
-    try { await deleteInspection(id) } catch {}
+    if (confirm('Tem certeza que deseja excluir este checklist?')) {
+        try { await deleteInspection(id) } catch {}
+    }
+  }
+
+  const handleEdit = (id: string) => {
+     // TODO: Implementar navegação para edição ou modal
+     // Por enquanto, apenas avisa que será implementado
+     alert('Funcionalidade de edição em desenvolvimento. Em breve você poderá editar os dados.')
   }
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR')
@@ -202,17 +218,30 @@ export default function ChecklistsPage() {
                   <p className="text-sm text white/80 capitalize">{item.tipo}</p>
                 </div>
                 {user?.role === 'admin' && (
-                <button
-                  type="button"
-                  onClick={(e) => { 
-                    e.preventDefault(); 
-                    handleDelete(item.local_id || item.id) 
-                  }}
-                  className="px-2 py-1 rounded-md bg-white/10 border border-white/30 hover:bg-white/20"
-                  aria-label="Excluir"
-                >
-                  <Trash className="w-4 h-4 text-white" />
-                </button>
+                <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        handleEdit(item.local_id || item.id) 
+                      }}
+                      className="px-2 py-1 rounded-md bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 text-blue-200"
+                      aria-label="Editar"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        handleDelete(item.local_id || item.id) 
+                      }}
+                      className="px-2 py-1 rounded-md bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 text-red-200"
+                      aria-label="Excluir"
+                    >
+                      <Trash className="w-4 h-4" />
+                    </button>
+                </div>
                 )}
               </div>
 
