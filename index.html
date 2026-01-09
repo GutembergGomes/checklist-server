@@ -4839,16 +4839,15 @@
         }
 
         // Forgot Password Logic
-        function showForgotPassword() {
+        window.showForgotPassword = function() {
             document.getElementById('loginModal').classList.add('hidden');
             document.getElementById('forgotPasswordModal').classList.remove('hidden');
         }
 
-        function closeForgotPassword() {
+        window.closeForgotPassword = function() {
             document.getElementById('forgotPasswordModal').classList.add('hidden');
             document.getElementById('loginModal').classList.remove('hidden');
         }
-        try { window.showForgotPassword = showForgotPassword; window.closeForgotPassword = closeForgotPassword; } catch(_) {}
 
         document.getElementById('forgotPasswordForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -4879,7 +4878,7 @@
         });
 
         // Alternar entre login e cadastro
-        function toggleAuthMode() {
+        window.toggleAuthMode = function() {
             const loginForm = document.getElementById('loginForm');
             const loginTitle = document.querySelector('#loginModal h2');
             const loginButton = loginForm.querySelector('button[type="submit"]');
@@ -4905,7 +4904,6 @@
                 if (lastNameGroup) lastNameGroup.classList.add('hidden');
             }
         }
-        try { window.toggleAuthMode = toggleAuthMode; } catch(_) {}
 
         // Processar formulário de autenticação
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
