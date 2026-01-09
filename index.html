@@ -4909,8 +4909,8 @@
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
+            const email = (document.getElementById('loginEmail').value || '').trim().toLowerCase();
+            const password = (document.getElementById('loginPassword').value || '').trim();
             const isSignUp = this.getAttribute('data-mode') === 'signup';
             const firstName = document.getElementById('firstName')?.value || '';
             const lastName = document.getElementById('lastName')?.value || '';
@@ -4922,6 +4922,8 @@
                     throw new Error('Cliente Supabase não inicializado. Verifique a URL e a chave.');
                 }
                 let result;
+                const submitBtn = document.getElementById('loginSubmit');
+                if (submitBtn) submitBtn.disabled = true;
                 
                 if (isSignUp) {
                     if (!firstName.trim() || !lastName.trim()) {
@@ -4945,6 +4947,9 @@
                 
                 if (error) {
                     throw error;
+                }
+                if (!data || (!data.user && !data.session)) {
+                    throw new Error('Falha no login. Verifique suas credenciais ou tente novamente.');
                 }
                 
                 if (isSignUp && data.user && !data.session) {
@@ -4981,9 +4986,10 @@
                 }
 
                 showCustomAlert(error.message || 'Falha na autenticação.');
-                showFloatingNotification('error', error.message);
+                showFloatingNotification('error', error.message || 'Falha na autenticação.');
             } finally {
                 showLoading(false);
+                try { const submitBtn2 = document.getElementById('loginSubmit'); if (submitBtn2) submitBtn2.disabled = false; } catch(_) {}
             }
         });
 
