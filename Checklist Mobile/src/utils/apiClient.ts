@@ -85,7 +85,16 @@ async function request(path: string, init: RequestInit = {}) {
              throw new Error(res.data && typeof res.data === 'string' ? res.data : `HTTP ${res.status}`)
         }
         
-        return res.data
+        // Ensure data is parsed if it comes as string
+        let data = res.data
+        if (typeof data === 'string') {
+            try {
+                data = JSON.parse(data)
+            } catch (e) {
+                console.warn('Failed to parse CapacitorHttp response:', data)
+            }
+        }
+        return data
     }
   } catch (error: any) {
     throw error

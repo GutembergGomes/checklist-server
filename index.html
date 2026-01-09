@@ -3209,6 +3209,8 @@
         
         // Estado global da aplicação
         let currentUser = null;
+        let isInitialLoading = false;
+        const EQUIP_SEEDED_FLAG = 'equipments_seeded_v2';
         let viewMode = 'global';
         let currentEquipment = '';
         let inspections = [];
@@ -4695,13 +4697,6 @@
             hydrateCCTSubsections();
         });
 
-        // Inicializar aplicação
-        document.addEventListener('DOMContentLoaded', function() {
-            checkAuthState();
-            updateDateTime();
-            setInterval(updateDateTime, 60000);
-        });
-
         // Verificar estado de autenticação
         async function refreshData() {
         const btn = document.querySelector('button[onclick="refreshData()"] svg');
@@ -4906,8 +4901,11 @@
         }
 
         // Processar formulário de autenticação
+        let isAuthSubmitting = false;
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            
+            if (isAuthSubmitting) return;
             
             const email = (document.getElementById('loginEmail').value || '').trim().toLowerCase();
             const password = (document.getElementById('loginPassword').value || '').trim();
@@ -4915,6 +4913,7 @@
             const firstName = document.getElementById('firstName')?.value || '';
             const lastName = document.getElementById('lastName')?.value || '';
             
+            isAuthSubmitting = true;
             showLoading(true);
             
             try {
@@ -4929,6 +4928,8 @@
                     if (!firstName.trim() || !lastName.trim()) {
                         showLoading(false);
                         showCustomAlert('Informe nome e sobrenome para cadastro.');
+                        isAuthSubmitting = false;
+                        if (submitBtn) submitBtn.disabled = false;
                         return;
                     }
                     try {
@@ -4940,6 +4941,8 @@
                         if (!exists.error && Array.isArray(exists.data) && exists.data.length > 0) {
                             showLoading(false);
                             showCustomAlert('Email já cadastrado. Use um novo email para criar conta.');
+                            isAuthSubmitting = false;
+                            if (submitBtn) submitBtn.disabled = false;
                             return;
                         }
                     } catch (_) {}
@@ -5000,19 +5003,14 @@
                 showCustomAlert(error.message || 'Falha na autenticação.');
                 showFloatingNotification('error', error.message || 'Falha na autenticação.');
             } finally {
+                isAuthSubmitting = false;
                 showLoading(false);
                 try { const submitBtn2 = document.getElementById('loginSubmit'); if (submitBtn2) submitBtn2.disabled = false; } catch(_) {}
             }
         });
 
-        const loginSubmitBtn = document.getElementById('loginSubmit');
-        if (loginSubmitBtn) {
-            loginSubmitBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                const form = document.getElementById('loginForm');
-                if (form) { form.requestSubmit(); }
-            });
-        }
+        // Event listener redundante removido para evitar submissão dupla
+
 
         // Logout
         async function logout() {
@@ -5069,6 +5067,8 @@
 
         // Carregar dados iniciais
         async function loadInitialData() {
+            if (isInitialLoading) return;
+            isInitialLoading = true;
             showLoading(true);
             try {
                 // Hidratar imediatamente com cache para acelerar a renderização
@@ -5090,15 +5090,18 @@
                     const fetchIns = supabase
                         .from('inspections')
                         .select('id,data,tipo,frota,mecanico,observacao,items,results,created_at,local_id')
-                        .order('created_at', { ascending: false });
+                        .order('created_at', { ascending: false })
+                        .limit(200);
                     const fetchIrr = supabase
                         .from('irrig_inspections')
                         .select('id,data,tipo,frota,mecanico,observacao,items,results,created_at,local_id')
-                        .order('created_at', { ascending: false });
+                        .order('created_at', { ascending: false })
+                        .limit(200);
                     const fetchResp = supabase
                         .from('respostas_checklist')
                         .select('*')
-                        .order('created_at', { ascending: false });
+                        .order('created_at', { ascending: false })
+                        .limit(1000);
                     const [resp, respIrr, respResp] = await Promise.allSettled([fetchIns, fetchIrr, fetchResp]);
                     if (resp.status === 'fulfilled' && !resp.value.error) {
                         const data = dedupeInspections(resp.value.data || []);
@@ -5161,17 +5164,21 @@
 
                 // Equipamentos e sementes em paralelo
                 await loadEquipments();
-                await Promise.all([
-                    seedTrucks(),
-                    seedHarvesters(),
-                    seedTractors(),
-                    seedPlanters(),
-                    seedDistributors(),
-                    seedTrailers(),
-                    seedTransbordos(),
-                    seedCobridores(),
-                    seedTortao()
-                ].map(p => p.catch ? p : Promise.resolve()));
+                const shouldSeed = isAdmin() && !localStorage.getItem(EQUIP_SEEDED_FLAG);
+                if (shouldSeed && isOnline()) {
+                    await Promise.all([
+                        seedTrucks(),
+                        seedHarvesters(),
+                        seedTractors(),
+                        seedPlanters(),
+                        seedDistributors(),
+                        seedTrailers(),
+                        seedTransbordos(),
+                        seedCobridores(),
+                        seedTortao()
+                    ].map(p => p.catch ? p : Promise.resolve()));
+                    try { localStorage.setItem(EQUIP_SEEDED_FLAG, '1'); } catch (_) {}
+                }
 
                 // Sincronizações pendentes em paralelo
                 await Promise.all([
@@ -5192,6 +5199,7 @@
                 showFloatingNotification('error', 'Erro ao carregar dados');
             } finally {
                 showLoading(false);
+                isInitialLoading = false;
             }
         }
 

@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom'
 
 export default function CCTPage() {
   const navigate = useNavigate()
-  const { user } = useAppStore()
+  const { user, allowedSections } = useAppStore() as any
   const [activeTab, setActiveTab] = useState<'inicio'|'historico'|'equipamentos'>('inicio')
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null)
 
@@ -24,10 +24,6 @@ export default function CCTPage() {
 
   const [savedData, setSavedData] = useState<any>(null)
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
   const metrics = useMemo(() => {
     const t = parseFloat(formData.temperatura || '0')
     const u = parseFloat(formData.umidade || '0')
@@ -41,6 +37,22 @@ export default function CCTPage() {
     else if (percentual < 70) nivelManutencao = 'Atenção'
     return { itensOK, itensNaoOK, percentual, nivelManutencao }
   }, [formData])
+
+  if (allowedSections && Array.isArray(allowedSections) && allowedSections.length > 0 && !allowedSections.includes('cct')) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white pt-20">
+         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800">
+              Acesso restrito: seu usuário não possui permissão para CCT.
+            </div>
+          </main>
+      </div>
+    )
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
 
   const handleSave = () => {
     // Validate required fields
@@ -115,22 +127,7 @@ export default function CCTPage() {
       style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1537151625747-768eb6cf92b7?auto=format&fit=crop&w=1600&q=60)' }}
     >
       <div className="absolute inset-0 bg-black/60" aria-hidden="true" />
-      {/* Header removido (duplicado com bottom navigation) */}
-      {/* Access control: bloquear se usuário não tiver seção 'cct' */}
-      {(() => {
-        const { allowedSections } = useAppStore() as any
-        if (Array.isArray(allowedSections) && allowedSections.length && !allowedSections.includes('cct')) {
-          return (
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800">
-                Acesso restrito: seu usuário não possui permissão para CCT.
-              </div>
-            </main>
-          )
-        }
-        return null
-      })()}
-
+      
       <div className="bg-white/90 dark:bg-black/70 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8 overflow-x-auto">
