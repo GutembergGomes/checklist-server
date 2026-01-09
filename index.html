@@ -4931,6 +4931,18 @@
                         showCustomAlert('Informe nome e sobrenome para cadastro.');
                         return;
                     }
+                    try {
+                        const exists = await supabase
+                          .from('users')
+                          .select('id')
+                          .eq('email', email)
+                          .limit(1);
+                        if (!exists.error && Array.isArray(exists.data) && exists.data.length > 0) {
+                            showLoading(false);
+                            showCustomAlert('Email já cadastrado. Use um novo email para criar conta.');
+                            return;
+                        }
+                    } catch (_) {}
                     result = await supabase.auth.signUp({
                         email,
                         password,
