@@ -5077,7 +5077,11 @@
                         .from('irrig_inspections')
                         .select('id,data,tipo,frota,mecanico,observacao,items,results,created_at,local_id')
                         .order('created_at', { ascending: false });
-                    const [resp, respIrr] = await Promise.allSettled([fetchIns, fetchIrr]);
+                    const fetchResp = supabase
+                        .from('respostas_checklist')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+                    const [resp, respIrr, respResp] = await Promise.allSettled([fetchIns, fetchIrr, fetchResp]);
                     if (resp.status === 'fulfilled' && !resp.value.error) {
                         const data = dedupeInspections(resp.value.data || []);
                         inspections = data || [];
@@ -5086,6 +5090,52 @@
                     if (respIrr.status === 'fulfilled' && !respIrr.value.error) {
                         irrigInspections = dedupeInspections(respIrr.value.data || []);
                         setCachedIrrInspections(irrigInspections);
+                    }
+                    if (respResp.status === 'fulfilled' && !respResp.value.error) {
+                        try {
+                            const base = Array.isArray(inspections) ? inspections.slice() : [];
+                            const ids = new Set(base.map(i => String(i.id || '')));
+                            const lids = new Set(base.map(i => String(i.local_id || '')));
+                            const rows = Array.isArray(respResp.value.data) ? respResp.value.data : [];
+                            const normalize = (s) => String(s || '').normalize('NFD').replace(/\\p{Diacritic}/gu, '').toLowerCase().trim();
+                            const mapped = rows.map(r => {
+                                let items = [];
+                                let ok = 0;
+                                let notOk = 0;
+                                try {
+                                    if (Array.isArray(r.respostas)) {
+                                        items = r.respostas.map(resp => {
+                                            const rawVal = resp?.valor;
+                                            const n = normalize(rawVal);
+                                            let status = 'na';
+                                            if (n === 'ok' || n === 'aprovado' || n === 'true' || n === 'sim' || n === 'conforme' || n === 'bom') status = 'ok';
+                                            else if (n.includes('nao ok') || n.includes('não ok') || n === 'reprovado' || n === 'false' || n === 'ruim') status = 'notok';
+                                            const note = typeof rawVal === 'string' ? rawVal : (rawVal === true ? 'OK' : (rawVal === false ? 'Não OK' : String(rawVal ?? '')));
+                                            return { id: resp?.item_id || resp?.id || '', name: resp?.descricao || 'Item', section: 'Geral', status, note };
+                                        });
+                                        ok = items.filter(i => i.status === 'ok').length;
+                                        notOk = items.filter(i => i.status === 'notok').length;
+                                    }
+                                } catch (_) {}
+                                const total = ok + notOk;
+                                const perc = total ? Math.round((ok / total) * 100) : 0;
+                                const nome = String((r.usuario_id || '')).includes('@') ? String(r.usuario_id || '').split('@')[0] : (r.usuario_id || 'Tecnico');
+                                return {
+                                    id: r.id,
+                                    local_id: r.id,
+                                    data: (r.data_execucao || '').toString().slice(0,10),
+                                    tipo: r.tipo || 'Checklist',
+                                    frota: r.equipamento_id || '',
+                                    mecanico: nome,
+                                    observacao: r.observacoes || '',
+                                    items,
+                                    results: { ok, notOk, percentage: perc },
+                                    created_at: r.created_at || r.data_execucao || new Date().toISOString()
+                                };
+                            }).filter(x => !ids.has(String(x.id || '')) && !lids.has(String(x.local_id || '')));
+                            inspections = dedupeInspections(base.concat(mapped));
+                            setCachedInspections(inspections);
+                        } catch (_) {}
                     }
                 } else {
                     showFloatingNotification('warning', 'Sem internet. Exibindo dados em cache.');
