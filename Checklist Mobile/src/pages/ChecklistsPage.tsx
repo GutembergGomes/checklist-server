@@ -124,9 +124,6 @@ export default function ChecklistsPage() {
     })
     .slice(0, page * pageSize)
 
-  
-
-  const { deleteInspection } = useAppStore()
   const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este checklist?')) {
         try { await deleteInspection(id) } catch {}

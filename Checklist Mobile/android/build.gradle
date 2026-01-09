@@ -35,6 +35,12 @@ subprojects {
             }
         }
     }
+    // Force Java toolchain to 17 for all JavaCompile tasks
+    tasks.withType(JavaCompile).configureEach {
+        javaCompiler = javaToolchains.compilerFor {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+    }
 }
 
 task clean(type: Delete) {

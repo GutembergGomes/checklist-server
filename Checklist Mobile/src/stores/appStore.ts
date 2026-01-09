@@ -521,7 +521,7 @@ export const useAppStore = create<AppState>()(
               addLog(`[DEBUG] Total final: ${merged.length}`)
               set({ inspections: merged })
               if (merged.length > 0) {
-                 get().notify({ message: `Dados carregados: ${merged.length} registros`, type: 'success' })
+                 notify({ message: `Dados carregados: ${merged.length} registros`, type: 'success' })
               }
           } catch (e: any) {
               addLog(`[DEBUG] Erro merge final: ${safeErr(e)}`)
@@ -541,7 +541,7 @@ export const useAppStore = create<AppState>()(
         } catch (error: any) {
           console.error('Load inspections error:', error)
           addLog(`[DEBUG] FATAL loadInspections: ${safeErr(error)}`)
-          get().notify({ message: 'Erro ao carregar dados. Verifique sua conexão.', type: 'error' })
+          notify({ message: 'Erro ao carregar dados. Verifique sua conexão.', type: 'error' })
           
           // Fallback to cache if everything fails
           if (cached.length > 0) {
@@ -993,7 +993,7 @@ export const useAppStore = create<AppState>()(
            const currentUser = get().user
            
            if (currentUser?.role !== 'admin') {
-              get().notify({ message: 'Permissão negada: Apenas administradores podem excluir.', type: 'error' })
+              notify({ message: 'Permissão negada: Apenas administradores podem excluir.', type: 'error' })
               return
            }
 
