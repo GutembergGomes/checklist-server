@@ -458,6 +458,11 @@
                     
                     <div class="flex items-center space-x-4">
                         <div class="text-sm text-gray-500 dark:text-gray-400" id="currentDateTime"></div>
+                        <button onclick="loadInitialData()" aria-label="Atualizar dados" title="Atualizar dados" class="p-2 rounded-md glass-morphism backdrop-blur-xs interactive-scale tooltip" data-tooltip="Atualizar dados">
+                            <svg class="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
                         <button onclick="toggleTheme()" aria-label="Alternar tema" title="Alternar tema" class="p-2 rounded-md glass-morphism backdrop-blur-xs interactive-scale tooltip" data-tooltip="Alternar tema">
                             <svg class="w-5 h-5 text-gray-700 dark:text-gray-300 inline dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v2m0 14v2m9-9h-2M5 12H3m15.364-6.364l-1.414 1.414M7.05 16.95l-1.414 1.414m12.728 0l-1.414-1.414M7.05 7.05L5.636 5.636M12 8a4 4 0 100 8 4 4 0 000-8z"/>
@@ -4698,7 +4703,25 @@
         });
 
         // Verificar estado de autenticação
-        async function checkAuthState() {
+        async function refreshData() {
+        const btn = document.querySelector('button[onclick="refreshData()"] svg');
+        if(btn) btn.classList.add('animate-spin');
+        
+        try {
+            await loadInspections();
+            await loadIrrigInspections();
+            updateStats();
+            updateHistoryTable();
+            showFloatingNotification('success', 'Dados atualizados com sucesso!');
+        } catch (error) {
+            console.error('Erro ao atualizar:', error);
+            showFloatingNotification('error', 'Erro ao atualizar dados.');
+        } finally {
+            if(btn) btn.classList.remove('animate-spin');
+        }
+    }
+
+    async function checkAuthState() {
             showLoading(true);
             
             try {
@@ -5041,6 +5064,7 @@
                     updateDashboardStats();
                     updateAnalytics();
                     setTimeout(initializeCharts, 250);
+                    updateHistoryTable();
                 } catch(_) {}
 
                 // Buscar online em paralelo e substituir cache quando disponível
@@ -5090,10 +5114,11 @@
                     syncPendingControle3p()
                 ].map(p => p.catch ? p : Promise.resolve()));
 
-                updateStats();
-                updateDashboardStats();
-                updateAnalytics();
-                setTimeout(initializeCharts, 250);
+                    updateStats();
+                    updateDashboardStats();
+                    updateAnalytics();
+                    setTimeout(initializeCharts, 250);
+                updateHistoryTable();
             } catch (error) {
                 console.error('Erro ao carregar dados:', error);
                 showFloatingNotification('error', 'Erro ao carregar dados');
@@ -5506,17 +5531,19 @@
                         const e = rec.header?.equipamento || '';
                         const u = rec.user_id || '';
                         const lid = String(rec.local_id || rec.id || '');
+                        const admin = isAdmin();
+                        const actions = admin 
+                            ? `<button class="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300" onclick="viewCalibragem('${lid}')">Ver</button>
+                                <button class="px-2 py-1 bg-yellow-500 text-white rounded-md" onclick="openEditCalibragem('${lid}')">Editar</button>
+                                <button class="px-2 py-1 bg-red-600 text-white rounded-md" onclick="deleteCalibragem('${lid}')">Excluir</button>`
+                            : `<button class="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300" onclick="viewCalibragem('${lid}')">Ver</button>`;
                         return `
                             <div class="py-3 flex items-center justify-between">
                                 <div>
                                     <div class="text-sm font-medium text-gray-900 dark:text-white">${f} — ${e}</div>
                                     <div class="text-xs text-gray-500 dark:text-gray-400">${d}${rec.offline ? ' • Offline' : ''}</div>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <button class="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300" onclick="viewCalibragem('${lid}')">Ver</button>
-                                    <button class="px-2 py-1 bg-yellow-500 text-white rounded-md" onclick="openEditCalibragem('${lid}')">Editar</button>
-                                    <button class="px-2 py-1 bg-red-600 text-white rounded-md" onclick="deleteCalibragem('${lid}')">Excluir</button>
-                                </div>
+                                <div class="flex items-center gap-2">${actions}</div>
                             </div>
                         `;
                     }).join('');
@@ -5528,17 +5555,19 @@
                         const e = rec.header?.equipamento || '';
                         const u = rec.user_id || '';
                         const lid = String(rec.local_id || rec.id || '');
+                        const admin = isAdmin();
+                        const actions = admin
+                            ? `<button class="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300" onclick="viewControle3p('${lid}')">Ver</button>
+                                <button class="px-2 py-1 bg-yellow-500 text-white rounded-md" onclick="openEditControle3p('${lid}')">Editar</button>
+                                <button class="px-2 py-1 bg-red-600 text-white rounded-md" onclick="deleteControle3p('${lid}')">Excluir</button>`
+                            : `<button class="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300" onclick="viewControle3p('${lid}')">Ver</button>`;
                         return `
                             <div class="py-3 flex items-center justify-between">
                                 <div>
                                     <div class="text-sm font-medium text-gray-900 dark:text-white">${f} — ${e}</div>
                                     <div class="text-xs text-gray-500 dark:text-gray-400">${d}${rec.offline ? ' • Offline' : ''}</div>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <button class="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300" onclick="viewControle3p('${lid}')">Ver</button>
-                                    <button class="px-2 py-1 bg-yellow-500 text-white rounded-md" onclick="openEditControle3p('${lid}')">Editar</button>
-                                    <button class="px-2 py-1 bg-red-600 text-white rounded-md" onclick="deleteControle3p('${lid}')">Excluir</button>
-                                </div>
+                                <div class="flex items-center gap-2">${actions}</div>
                             </div>
                         `;
                     }).join('');
@@ -5664,6 +5693,7 @@
         }
 
         async function openEditCalibragem(localId) {
+            if (!isAdmin()) { showCustomAlert('Acesso restrito.'); return; }
             const rec = await findCalibragemByLocalId(localId);
             if (!rec) { showCustomAlert('Registro não encontrado'); return; }
             showSection('calibragem');
@@ -5701,6 +5731,7 @@
         }
 
         async function openEditControle3p(localId) {
+            if (!isAdmin()) { showCustomAlert('Acesso restrito.'); return; }
             const rec = await findControle3pByLocalId(localId);
             if (!rec) { showCustomAlert('Registro não encontrado'); return; }
             showSection('controle3p');
@@ -5743,6 +5774,7 @@
 
         async function deleteCalibragem(localId) {
             try {
+                if (!isAdmin()) { showCustomAlert('Acesso restrito.'); return; }
                 if (!confirm('Deseja excluir este lançamento de calibragem?')) return;
                 let q = getPendingCalibragem();
                 const idx = q.findIndex(i => String(i.local_id) === String(localId));
@@ -5755,6 +5787,7 @@
 
         async function deleteControle3p(localId) {
             try {
+                if (!isAdmin()) { showCustomAlert('Acesso restrito.'); return; }
                 if (!confirm('Deseja excluir esta Ficha 3P?')) return;
                 let q = getPendingControle3p();
                 const idx = q.findIndex(i => String(i.local_id) === String(localId));
@@ -7910,7 +7943,7 @@
 
         function isAdmin() {
             const u = currentUser || getCachedUser();
-            return !!(u && u.email === 'gutemberggg10@gmail.com');
+            return !!(u && (u.email === 'gutemberggg10@gmail.com' || u.role === 'admin'));
         }
 
         let accessControls = [];
