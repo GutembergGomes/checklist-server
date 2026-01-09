@@ -35,11 +35,9 @@ async function request(path: string, init: RequestInit = {}) {
   }
   const token = getToken()
 
-  // BYPASS AUTH for inspections/respostas GET to allow legacy data access
-  // This solves the issue where legacy Mongo ObjectIds don't match Supabase UUIDs in RLS
-  const isLegacyRead = (path.includes('/db/inspections') || path.includes('/db/respostas_checklist')) && (init.method === 'GET' || !init.method)
-
-  if (token && !isLegacyRead) {
+  // ALWAYS send token if available. 
+  // Removing it caused RLS (Row Level Security) to block access for logged-in users (viewing as anonymous).
+  if (token) {
       headers['Authorization'] = `Bearer ${token}`
   }
 
