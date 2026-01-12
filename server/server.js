@@ -4,14 +4,13 @@ const cors = require('cors')
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
-const multer = require('multer')
-const { MongoClient, ObjectId, GridFSBucket } = require('mongodb')
+const { Pool } = require('pg')
 
 const app = express()
 const PORT = process.env.PORT || 8080
 const STORAGE_DIR = path.join(__dirname, 'storage')
 const DATA_FILE = path.join(__dirname, 'data.json')
-const MONGODB_URI = process.env.MONGODB_URI
+const DATABASE_URL = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/checklist'
 
 // Middleware
 app.use(cors())
@@ -21,19 +20,34 @@ app.use(express.json({ limit: '50mb' }))
 if (!fs.existsSync(STORAGE_DIR)) fs.mkdirSync(STORAGE_DIR, { recursive: true })
 
 // Database Connection
-let db = null
-let mongoClient = null
+let pgPool = null
 
 async function connectDB() {
-  if (MONGODB_URI) {
+  if (DATABASE_URL) {
     try {
-      mongoClient = new MongoClient(MONGODB_URI)
-      await mongoClient.connect()
-      db = mongoClient.db()
-      console.log('Connected to MongoDB')
+      const pool = new Pool({
+        connectionString: DATABASE_URL,
+      })
+      // Test connection
+      await pool.query('SELECT NOW()')
+      console.log('Connected to PostgreSQL')
+      pgPool = pool
+      await initSchema()
     } catch (e) {
-      console.error('MongoDB connection failed, falling back to JSON file:', e)
+      console.error('PostgreSQL connection failed, falling back to JSON file:', e.message)
+      console.error('Ensure PostgreSQL is running and DATABASE_URL is correct.')
     }
+  }
+}
+
+async function initSchema() {
+  if (!pgPool) return
+  try {
+    const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8')
+    await pgPool.query(schemaSql)
+    console.log('Database schema initialized')
+  } catch (e) {
+    console.error('Schema initialization failed:', e)
   }
 }
 
@@ -53,36 +67,51 @@ function writeJsonData(data) {
 
 // Helper: Generic DB Operations
 async function dbFind(collection, query = {}, limit = 0, sort = {}) {
-  if (db) {
-    // Mongo
-    // Convert id to string for consistency
-    let cursor = db.collection(collection).find(query)
-    if (Object.keys(sort).length) cursor = cursor.sort(sort)
-    if (limit) cursor = cursor.limit(limit)
-    const docs = await cursor.toArray()
-    // Prefer the explicit 'id' field if it exists, otherwise fall back to _id
-    return docs.map(d => {
-      const { _id, ...rest } = d
-      return { ...rest, id: rest.id || _id.toString() }
-    })
+  if (pgPool) {
+    try {
+      // Build WHERE clause
+      const conditions = []
+      const values = []
+      let i = 1
+      for (const [k, v] of Object.entries(query)) {
+        conditions.push(`${k} = $${i}`)
+        values.push(v)
+        i++
+      }
+      const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+      
+      // Build ORDER BY
+      const orderClauses = []
+      for (const [k, dir] of Object.entries(sort)) {
+        orderClauses.push(`${k} ${dir === 1 || dir === 'asc' ? 'ASC' : 'DESC'}`)
+      }
+      const orderByClause = orderClauses.length ? `ORDER BY ${orderClauses.join(', ')}` : ''
+      
+      // Build LIMIT
+      const limitClause = limit ? `LIMIT ${limit}` : ''
+      
+      const sql = `SELECT * FROM ${collection} ${whereClause} ${orderByClause} ${limitClause}`
+      const res = await pgPool.query(sql, values)
+      return res.rows
+    } catch (e) {
+      console.error(`dbFind error in ${collection}:`, e)
+      return []
+    }
   } else {
-    // JSON
+    // JSON Fallback
     const data = readJsonData()
     let list = data[collection] || []
-    // Basic filter support (equality)
     for (const [k, v] of Object.entries(query)) {
       list = list.filter(item => String(item[k]) === String(v))
     }
-    // Sort support
     if (Object.keys(sort).length) {
-      const [key, dir] = Object.entries(sort)[0] // simplified single col sort
+      const [key, dir] = Object.entries(sort)[0]
       list.sort((a, b) => {
         if (a[key] < b[key]) return dir === 1 ? -1 : 1
         if (a[key] > b[key]) return dir === 1 ? 1 : -1
         return 0
       })
     }
-    // Limit
     if (limit) list = list.slice(0, limit)
     return list
   }
@@ -97,15 +126,23 @@ async function dbInsert(collection, items) {
     updated_at: new Date().toISOString()
   }))
 
-  if (db) {
-    // Mongo
-    // Use custom ID as _id if possible, or keep separate? 
-    // Supabase uses UUIDs. Mongo uses ObjectIds.
-    // Let's store 'id' as a field and let Mongo manage _id, but we return 'id'.
-    await db.collection(collection).insertMany(prepared)
-    return prepared
+  if (pgPool) {
+    try {
+      const results = []
+      for (const item of prepared) {
+        const keys = Object.keys(item)
+        const values = Object.values(item)
+        const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ')
+        const sql = `INSERT INTO ${collection} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`
+        const res = await pgPool.query(sql, values)
+        results.push(res.rows[0])
+      }
+      return results
+    } catch (e) {
+      console.error(`dbInsert error in ${collection}:`, e)
+      throw e
+    }
   } else {
-    // JSON
     const data = readJsonData()
     if (!data[collection]) data[collection] = []
     data[collection].push(...prepared)
@@ -118,38 +155,41 @@ async function dbUpsert(collection, items, onConflict = 'id') {
   const payload = Array.isArray(items) ? items : [items]
   const results = []
   
-  if (db) {
-    // Mongo
-    for (const item of payload) {
-      const filter = { [onConflict]: item[onConflict] || item.id }
-      if (!filter[onConflict]) {
-        // Insert new if no conflict key
-        const inserted = await dbInsert(collection, [item])
-        results.push(inserted[0])
-        continue
+  if (pgPool) {
+    try {
+      for (const item of payload) {
+        // Ensure id exists
+        if (!item.id) item.id = crypto.randomUUID()
+        // Ensure timestamps
+        if (!item.created_at) item.created_at = new Date().toISOString()
+        item.updated_at = new Date().toISOString()
+
+        const keys = Object.keys(item)
+        const values = Object.values(item)
+        const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ')
+        
+        // Build UPDATE SET clause for ON CONFLICT
+        // Exclude created_at from update
+        const updateSet = keys
+          .filter(k => k !== 'created_at' && k !== onConflict)
+          .map(k => `${k} = EXCLUDED.${k}`)
+          .join(', ')
+
+        const sql = `
+          INSERT INTO ${collection} (${keys.join(', ')}) 
+          VALUES (${placeholders}) 
+          ON CONFLICT (${onConflict}) 
+          DO UPDATE SET ${updateSet}
+          RETURNING *
+        `
+        const res = await pgPool.query(sql, values)
+        results.push(res.rows[0])
       }
-      
-      // Ensure created_at is NEVER in $set
-      const { created_at, _id, ...updateFields } = item
-      // Double check cleanup
-      if ('created_at' in updateFields) delete updateFields.created_at
-      
-      const update = { 
-        $set: { ...updateFields, updated_at: new Date().toISOString() }, 
-        $setOnInsert: { created_at: created_at || new Date().toISOString() } 
-      }
-      if (!item.id) update.$setOnInsert.id = crypto.randomUUID()
-      
-      const res = await db.collection(collection).findOneAndUpdate(filter, update, { upsert: true, returnDocument: 'after' })
-      // res.value is the doc
-      // In newer Mongo driver, findOneAndUpdate returns object with value/ok
-      // Actually standard driver returns result object.
-      // Let's fetch it after upsert to be safe/simple
-      const doc = await db.collection(collection).findOne(filter)
-      results.push({ ...doc, id: doc.id || doc._id.toString(), _id: undefined })
+    } catch (e) {
+      console.error(`dbUpsert error in ${collection}:`, e)
+      throw e
     }
   } else {
-    // JSON
     const data = readJsonData()
     if (!data[collection]) data[collection] = []
     const list = data[collection]
@@ -177,9 +217,14 @@ async function dbUpsert(collection, items, onConflict = 'id') {
 }
 
 async function dbDelete(collection, id) {
-  if (db) {
-    await db.collection(collection).deleteOne({ id: id })
-    return [{ id }]
+  if (pgPool) {
+    try {
+      await pgPool.query(`DELETE FROM ${collection} WHERE id = $1`, [id])
+      return [{ id }]
+    } catch (e) {
+      console.error(`dbDelete error in ${collection}:`, e)
+      throw e
+    }
   } else {
     const data = readJsonData()
     if (!data[collection]) return []
@@ -193,11 +238,9 @@ async function dbDelete(collection, id) {
 // --- Routes ---
 
 // Health
-app.get('/', (req, res) => res.json({ status: 'online', mode: db ? 'mongodb' : 'json' }))
+app.get('/', (req, res) => res.json({ status: 'online', mode: pgPool ? 'postgresql' : 'json' }))
 
-// Auth (Persistent via MongoDB)
-// const sessions = new Map() // REMOVED: In-memory sessions cause disconnects on restart
-
+// Auth (Persistent)
 function sanitizeUser(user) {
   if (!user || typeof user !== 'object') return user
   const { password, ...safe } = user
@@ -241,11 +284,9 @@ app.post('/auth/signup', async (req, res) => {
       return res.status(400).json({ error: 'User already exists' })
     }
 
-    // Extrair metadados se fornecidos
     const metadata = (options && options.data) ? options.data : {}
     const defaultName = email.split('@')[0]
     
-    // Garantir que user_metadata tenha algo útil
     const user_metadata = {
         name: defaultName,
         ...metadata
@@ -254,7 +295,7 @@ app.post('/auth/signup', async (req, res) => {
     const user = {
       id: crypto.randomUUID(),
       email,
-      password, // In production, hash this!
+      password,
       user_metadata: user_metadata,
       created_at: new Date().toISOString()
     }
@@ -262,7 +303,6 @@ app.post('/auth/signup', async (req, res) => {
     await dbInsert('users', user)
     
     const token = crypto.randomUUID()
-    // Persist session in DB
     await dbInsert('sessions', { 
         id: crypto.randomUUID(),
         token, 
@@ -280,34 +320,26 @@ app.post('/auth/signup', async (req, res) => {
 
 app.post('/auth/signin', async (req, res) => {
   const { email, password } = req.body
-  // Accept any login for now or check against DB
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
   
-  // Try to find existing user to preserve ID
   try {
     const users = await dbFind('users', { email })
     let user = users[0]
 
     if (!user) {
-        // Bloquear acesso de não cadastrados
         return res.status(400).json({ error: 'Usuário não encontrado. Faça o cadastro.' })
     }
 
-    // Verificar senha
     if (user.password) {
         if (user.password !== password) {
             return res.status(401).json({ error: 'Senha incorreta' })
         }
     } else {
-        // Migração: Usuário antigo sem senha -> Define a senha agora
         user.password = password
-        // Atualizar no banco
-        // Precisamos de um dbUpdate ou dbUpsert
         await dbUpsert('users', [user], 'id')
     }
 
     const token = crypto.randomUUID()
-    // Persist session in DB
     await dbInsert('sessions', { 
         id: crypto.randomUUID(),
         token, 
@@ -438,24 +470,12 @@ app.delete('/db/:table/:id', requireAuth(async (req, res) => {
 }))
 
 // Storage Routes
-// Handle raw body upload (apiClient sends body: file)
+// Using local filesystem for all storage when not using Mongo (and even if using PG, for now)
 app.post('/storage/upload', requireAuth((req, res) => {
   const bucket = req.query.bucket
   const filePath = req.query.path
   
   if (!bucket || !filePath) return res.status(400).json({ error: 'Missing bucket/path' })
-
-  if (db) {
-    // MongoDB GridFS
-    const gridFs = new GridFSBucket(db, { bucketName: bucket })
-    const uploadStream = gridFs.openUploadStream(filePath)
-    
-    req.pipe(uploadStream)
-    
-    uploadStream.on('finish', () => res.json({ key: `${bucket}/${filePath}` }))
-    uploadStream.on('error', (e) => res.status(500).json({ error: e.message }))
-    return
-  }
 
   // Local Filesystem
   const fullPath = path.join(STORAGE_DIR, bucket, filePath)
@@ -469,7 +489,7 @@ app.post('/storage/upload', requireAuth((req, res) => {
   writeStream.on('error', (e) => res.status(500).json({ error: e.message }))
 }))
 
-// Legacy raw route (can be removed if client uses above)
+// Legacy raw route
 app.post('/storage/upload_raw', requireAuth((req, res) => {
   res.redirect(307, `/storage/upload?bucket=${req.query.bucket}&path=${req.query.path}`)
 }))
@@ -479,16 +499,6 @@ app.get('/storage/file/:bucket/*', (req, res) => {
   const bucket = req.params.bucket
   const filePath = req.params[0]
   
-  if (db) {
-    // MongoDB GridFS
-    const gridFs = new GridFSBucket(db, { bucketName: bucket })
-    const downloadStream = gridFs.openDownloadStreamByName(filePath)
-    
-    downloadStream.on('error', () => res.status(404).json({ error: 'File not found' }))
-    downloadStream.pipe(res)
-    return
-  }
-
   // Local Filesystem
   const fullPath = path.join(STORAGE_DIR, bucket, filePath)
   if (fs.existsSync(fullPath)) {
@@ -502,6 +512,6 @@ app.get('/storage/file/:bucket/*', (req, res) => {
 connectDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`)
-    console.log(`Mode: ${db ? 'MongoDB' : 'JSON File'}`)
+    console.log(`Mode: ${pgPool ? 'PostgreSQL' : 'JSON File'}`)
   })
 })
