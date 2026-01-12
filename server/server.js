@@ -133,7 +133,10 @@ async function dbInsert(collection, items) {
         const keys = Object.keys(item)
         const values = Object.values(item)
         const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ')
-        const sql = `INSERT INTO ${collection} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`
+        // Quote keys to handle reserved words like "user"
+        const columns = keys.map(k => `"${k}"`).join(', ')
+        
+        const sql = `INSERT INTO ${collection} (${columns}) VALUES (${placeholders}) RETURNING *`
         const res = await pgPool.query(sql, values)
         results.push(res.rows[0])
       }
@@ -167,16 +170,17 @@ async function dbUpsert(collection, items, onConflict = 'id') {
         const keys = Object.keys(item)
         const values = Object.values(item)
         const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ')
+        const columns = keys.map(k => `"${k}"`).join(', ')
         
         // Build UPDATE SET clause for ON CONFLICT
         // Exclude created_at from update
         const updateSet = keys
           .filter(k => k !== 'created_at' && k !== onConflict)
-          .map(k => `${k} = EXCLUDED.${k}`)
+          .map(k => `"${k}" = EXCLUDED."${k}"`)
           .join(', ')
 
         const sql = `
-          INSERT INTO ${collection} (${keys.join(', ')}) 
+          INSERT INTO ${collection} (${columns}) 
           VALUES (${placeholders}) 
           ON CONFLICT (${onConflict}) 
           DO UPDATE SET ${updateSet}
